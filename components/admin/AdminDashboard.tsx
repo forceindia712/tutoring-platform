@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Card, ErrorNote } from "@/components/ui";
+import { LessonSearch } from "@/components/admin/LessonSearch";
 import {
   listAllMaterials,
   listAllMeetings,
@@ -127,6 +128,12 @@ export function AdminDashboard() {
           </Link>
         </Card>
       </div>
+
+      <LessonSearch
+        meetings={meetings}
+        students={students}
+        materials={materials}
+      />
 
       <section className="mt-10">
         <h2 className="text-lg font-semibold text-zinc-900">

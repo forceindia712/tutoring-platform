@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BackLink, Button, Card, EmptyState, ErrorNote } from "@/components/ui";
+import {
+  BackLink,
+  Button,
+  Card,
+  EmptyState,
+  ErrorNote,
+  Select,
+} from "@/components/ui";
 import { StudentForm } from "@/components/admin/StudentForm";
 import { StudentLink } from "@/components/admin/StudentLink";
 import { StudentInfosManager } from "@/components/admin/StudentInfosManager";
@@ -17,6 +24,7 @@ export function StudentProfile({ studentId }: { studentId: string }) {
   const [student, setStudent] = useState<Student | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [editing, setEditing] = useState(false);
+  const [meetingOrder, setMeetingOrder] = useState<"desc" | "asc">("desc");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -71,6 +79,14 @@ export function StudentProfile({ studentId }: { studentId: string }) {
       </div>
     );
   }
+
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    const left = `${a.meeting_date}T${a.meeting_time}`;
+    const right = `${b.meeting_date}T${b.meeting_time}`;
+    return meetingOrder === "desc"
+      ? right.localeCompare(left)
+      : left.localeCompare(right);
+  });
 
   return (
     <div>
@@ -140,12 +156,28 @@ export function StudentProfile({ studentId }: { studentId: string }) {
       <div className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-900">Spotkania</h2>
-          <Link
-            href={`/admin/students/${student.id}/meetings/new`}
-            className="inline-flex h-10 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
-          >
-            Dodaj spotkanie
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-zinc-600">
+              Sortowanie
+              <Select
+                value={meetingOrder}
+                onChange={(event) =>
+                  setMeetingOrder(event.target.value as "desc" | "asc")
+                }
+                className="w-44"
+                aria-label="Sortowanie spotkań"
+              >
+                <option value="desc">Od najnowszych</option>
+                <option value="asc">Od najstarszych</option>
+              </Select>
+            </label>
+            <Link
+              href={`/admin/students/${student.id}/meetings/new`}
+              className="inline-flex h-10 items-center rounded-lg bg-zinc-900 px-4 text-sm font-medium text-white transition-colors hover:bg-zinc-700"
+            >
+              Dodaj spotkanie
+            </Link>
+          </div>
         </div>
 
         {meetings.length === 0 ? (
@@ -154,7 +186,7 @@ export function StudentProfile({ studentId }: { studentId: string }) {
           </div>
         ) : (
           <div className="mt-4 space-y-3">
-            {meetings.map((meeting) => (
+            {sortedMeetings.map((meeting) => (
               <Card
                 key={meeting.id}
                 className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"

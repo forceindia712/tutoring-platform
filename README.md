@@ -159,6 +159,8 @@ Po zalogowaniu możesz:
 - dodawać ogólne informacje widoczne dla ucznia (np. harmonogram i stały link);
 - dodawać do spotkania materiały: link, plik (link np. z Google Drive), tekst, zadanie lub notatkę;
 - edytować, usuwać i zmieniać kolejność materiałów.
+- szukać lekcji po instrukcjach, notatkach i materiałach (np. wpisanie „ułamki” pokaże spotkania o ułamkach);
+- sortować listę spotkań ucznia od najnowszych lub od najstarszych.
 
 ### Materiały „Plik” jako linki
 
