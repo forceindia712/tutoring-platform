@@ -26,6 +26,8 @@ type MeetingFormProps = {
   onSaved: (meetingId: string) => void;
 };
 
+type MeetingMode = "online" | "stacjonarne";
+
 export function MeetingForm({
   fixedStudent,
   meeting,
@@ -48,7 +50,13 @@ export function MeetingForm({
   const [time, setTime] = useState(
     meeting?.meeting_time.slice(0, 5) ?? "17:00",
   );
+  const [mode, setMode] = useState<MeetingMode>(
+    meeting?.meeting_url ? "online" : "stacjonarne",
+  );
   const [url, setUrl] = useState(meeting?.meeting_url ?? "");
+  const [location, setLocation] = useState(
+    meeting?.meeting_location ?? "",
+  );
   const [instructions, setInstructions] = useState(
     meeting?.instructions ?? "",
   );
@@ -98,6 +106,15 @@ export function MeetingForm({
     }
   }
 
+  function handleModeChange(nextMode: MeetingMode) {
+    setMode(nextMode);
+    if (nextMode === "stacjonarne") {
+      setUrl("");
+    } else {
+      setLocation("");
+    }
+  }
+
   async function nextNumberFor(studentId: string): Promise<number> {
     const data = await listMeetingsForStudent(studentId);
     const numbers = data.map((item) => item.meeting_number);
@@ -108,6 +125,11 @@ export function MeetingForm({
     event.preventDefault();
     if (!selectedStudentId) {
       setError("Wybierz ucznia.");
+      return;
+    }
+
+    if (mode === "online" && !url.trim()) {
+      setError("Podaj link do spotkania online.");
       return;
     }
 
@@ -128,7 +150,9 @@ export function MeetingForm({
         meeting_number: number,
         meeting_date: date,
         meeting_time: time,
-        meeting_url: url.trim() || null,
+        meeting_url: mode === "online" ? url.trim() : null,
+        meeting_location:
+          mode === "stacjonarne" ? location.trim() || null : null,
         instructions: instructions.trim() || null,
         notes: notes.trim() || null,
       };
@@ -229,20 +253,52 @@ export function MeetingForm({
           </Field>
         </div>
 
-        <Field
-          label="Link do spotkania online"
-          htmlFor="meeting-url"
-          hint="Opcjonalnie, np. Google Meet, Zoom lub Teams."
-        >
-          <Input
-            id="meeting-url"
-            type="url"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://…"
+        <Field label="Rodzaj spotkania" htmlFor="meeting-mode">
+          <Select
+            id="meeting-mode"
+            value={mode}
+            onChange={(event) =>
+              handleModeChange(event.target.value as MeetingMode)
+            }
             disabled={saving}
-          />
+          >
+            <option value="online">Spotkanie online</option>
+            <option value="stacjonarne">Spotkanie stacjonarne</option>
+          </Select>
         </Field>
+
+        {mode === "online" ? (
+          <Field
+            label="Link do spotkania online"
+            htmlFor="meeting-url"
+            hint="np. Google Meet, Zoom lub Teams"
+          >
+            <Input
+              id="meeting-url"
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://…"
+              required
+              disabled={saving}
+            />
+          </Field>
+        ) : (
+          <Field
+            label="Miejsce spotkania"
+            htmlFor="meeting-location"
+            hint="Opcjonalnie – np. adres, szkoła, kawiarnia."
+          >
+            <Input
+              id="meeting-location"
+              type="text"
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="np. ul. Polna 5, Warszawa"
+              disabled={saving}
+            />
+          </Field>
+        )}
 
         <Field
           label="Instrukcje"

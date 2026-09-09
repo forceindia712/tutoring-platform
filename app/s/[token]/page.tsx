@@ -3,6 +3,7 @@ import { StudentDashboard } from "@/components/student/StudentDashboard";
 import { StudentMessage } from "@/components/student/StudentMessage";
 import {
   findStudentByToken,
+  getStudentInfos,
   getStudentMeetings,
 } from "@/lib/data/student";
 
@@ -20,6 +21,7 @@ export default async function StudentPanelPage({
   const { token } = await params;
   let student: Awaited<ReturnType<typeof findStudentByToken>> = null;
   let meetings: Awaited<ReturnType<typeof getStudentMeetings>> = [];
+  let infos: Awaited<ReturnType<typeof getStudentInfos>> = [];
   let fetchFailed = false;
 
   if (!/^[a-zA-Z0-9]{6,40}$/.test(token)) {
@@ -33,7 +35,14 @@ export default async function StudentPanelPage({
 
   try {
     student = await findStudentByToken(token);
-    meetings = student ? await getStudentMeetings(student.id) : [];
+    if (student) {
+      const [studentMeetings, studentInfos] = await Promise.all([
+        getStudentMeetings(student.id),
+        getStudentInfos(student.id),
+      ]);
+      meetings = studentMeetings;
+      infos = studentInfos;
+    }
   } catch {
     fetchFailed = true;
   }
@@ -61,6 +70,7 @@ export default async function StudentPanelPage({
       studentToken={token}
       firstName={student.first_name}
       meetings={meetings}
+      infos={infos}
     />
   );
 }

@@ -153,6 +153,14 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
                 Otwórz link do spotkania
               </a>
             ) : null}
+            {!meeting.meeting_url ? (
+              <p className="mt-3 text-sm text-zinc-600">
+                Spotkanie stacjonarne
+                {meeting.meeting_location
+                  ? ` · ${meeting.meeting_location}`
+                  : ""}
+              </p>
+            ) : null}
           </Card>
         </aside>
       </div>

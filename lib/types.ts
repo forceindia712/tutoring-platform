@@ -17,6 +17,7 @@ export type Meeting = {
   meeting_date: string;
   meeting_time: string;
   meeting_url: string | null;
+  meeting_location: string | null;
   instructions: string | null;
   notes: string | null;
   created_at: string;
@@ -30,6 +31,17 @@ export type Material = {
   title: string;
   description: string | null;
   url: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
+export type StudentInfo = {
+  id: string;
+  student_id: string;
+  title: string;
+  content: string | null;
+  url: string | null;
+  url_label: string | null;
   sort_order: number;
   created_at: string;
 };

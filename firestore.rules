@@ -23,5 +23,9 @@ service cloud.firestore {
     match /materials/{materialId} {
       allow read, write: if isTeacher();
     }
+
+    match /student_infos/{infoId} {
+      allow read, write: if isTeacher();
+    }
   }
 }

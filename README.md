@@ -70,14 +70,20 @@ students
 
 meetings
   id, student_id, meeting_number, meeting_date, meeting_time,
-  meeting_url, instructions, notes, created_at, updated_at
+  meeting_url, meeting_location, instructions, notes, created_at, updated_at
 
 materials
   id, meeting_id, type, title, description, url,
   sort_order, created_at
+
+student_infos
+  id, student_id, title, content, url, url_label,
+  sort_order, created_at
 ```
 
 Pole `url` służy zarówno typowi „Link”, jak i „Plik” – w obu przypadkach nauczyciel zapisuje adres strony lub udostępnionego pliku.
+Spotkanie bez linku jest traktowane jako stacjonarne – nauczyciel może dopisać miejsce (`meeting_location`).
+`student_infos` to ogólne informacje pokazywane uczniowi na jego stronie głównej (np. harmonogram albo stały link do spotkań online).
 
 ## 3. Firebase Auth (tylko nauczyciel)
 
@@ -148,8 +154,9 @@ Po zalogowaniu możesz:
 
 - dodawać, edytować i usuwać uczniów;
 - kopiować indywidualny link ucznia;
-- tworzyć spotkania (numer domyślnie wyliczany jako następny);
+- tworzyć spotkania online albo stacjonarne (numer domyślnie wyliczany jako następny);
 - edytować daty, godziny, linki online, instrukcje i notatki;
+- dodawać ogólne informacje widoczne dla ucznia (np. harmonogram i stały link);
 - dodawać do spotkania materiały: link, plik (link np. z Google Drive), tekst, zadanie lub notatkę;
 - edytować, usuwać i zmieniać kolejność materiałów.
 

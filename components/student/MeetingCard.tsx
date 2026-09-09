@@ -18,6 +18,12 @@ export function MeetingCard({ meeting, studentToken }: MeetingCardProps) {
         <p className="mt-1 text-sm text-zinc-600">
           {formatDateTime(meeting.meeting_date, meeting.meeting_time)}
         </p>
+        {!meeting.meeting_url ? (
+          <p className="mt-1 text-sm text-zinc-500">
+            Spotkanie stacjonarne
+            {meeting.meeting_location ? ` · ${meeting.meeting_location}` : ""}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

@@ -158,6 +158,7 @@ export function AdminDashboard() {
                           {student ? studentFullName(student) : "Uczeń"}
                         </span>
                         <span className="text-sm text-zinc-500">
+                          {!meeting.meeting_url ? "Stacjonarne · " : ""}
                           Spotkanie #{meeting.meeting_number}
                         </span>
                       </Link>

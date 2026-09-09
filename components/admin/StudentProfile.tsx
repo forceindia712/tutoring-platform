@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { BackLink, Button, Card, EmptyState, ErrorNote } from "@/components/ui";
 import { StudentForm } from "@/components/admin/StudentForm";
 import { StudentLink } from "@/components/admin/StudentLink";
+import { StudentInfosManager } from "@/components/admin/StudentInfosManager";
 import { deleteStudent, getStudent, listMeetingsForStudent } from "@/lib/firebase/clientDb";
 import { studentFullName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
@@ -42,7 +43,7 @@ export function StudentProfile({ studentId }: { studentId: string }) {
     if (!student) return;
     if (
       !window.confirm(
-        `Usunąć ucznia ${studentFullName(student)}? Jego spotkania i materiały również zostaną usunięte.`,
+        `Usunąć ucznia ${studentFullName(student)}? Jego spotkania, materiały i informacje również zostaną usunięte.`,
       )
     ) {
       return;
@@ -133,6 +134,10 @@ export function StudentProfile({ studentId }: { studentId: string }) {
       ) : null}
 
       <div className="mt-10">
+        <StudentInfosManager studentId={student.id} />
+      </div>
+
+      <div className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-zinc-900">Spotkania</h2>
           <Link
@@ -161,6 +166,14 @@ export function StudentProfile({ studentId }: { studentId: string }) {
                   <p className="mt-0.5 text-sm text-zinc-600">
                     {formatDateTime(meeting.meeting_date, meeting.meeting_time)}
                   </p>
+                  {!meeting.meeting_url ? (
+                    <p className="mt-0.5 text-sm text-zinc-500">
+                      Spotkanie stacjonarne
+                      {meeting.meeting_location
+                        ? ` · ${meeting.meeting_location}`
+                        : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <Link
                   href={`/admin/meetings/${meeting.id}`}

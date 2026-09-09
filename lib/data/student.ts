@@ -2,7 +2,12 @@ import "server-only";
 
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { hydrateFromFirestore } from "@/lib/firebase/convert";
-import type { Material, Meeting, StudentSummary } from "@/lib/types";
+import type {
+  Material,
+  Meeting,
+  StudentInfo,
+  StudentSummary,
+} from "@/lib/types";
 
 export async function findStudentByToken(
   token: string,
@@ -67,6 +72,19 @@ export async function getMaterialsForMeeting(
     .map((materialSnapshot) =>
       hydrateFromFirestore<Material>(materialSnapshot),
     )
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+export async function getStudentInfos(
+  studentId: string,
+): Promise<StudentInfo[]> {
+  const snapshot = await getAdminFirestore()
+    .collection("student_infos")
+    .where("student_id", "==", studentId)
+    .get();
+
+  return snapshot.docs
+    .map((infoSnapshot) => hydrateFromFirestore<StudentInfo>(infoSnapshot))
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 

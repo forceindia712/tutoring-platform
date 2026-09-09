@@ -16,7 +16,7 @@ import { getFirestoreClient } from "@/lib/firebase/client";
 import { hydrateFromFirestore } from "@/lib/firebase/convert";
 import { normalizedFullName } from "@/lib/names";
 import { generateAccessToken } from "@/lib/token";
-import type { Material, Meeting, Student } from "@/lib/types";
+import type { Material, Meeting, Student, StudentInfo } from "@/lib/types";
 
 function db() {
   return getFirestoreClient();
@@ -96,6 +96,16 @@ export async function deleteStudent(studentId: string): Promise<void> {
     await deleteDoc(doc(db(), "meetings", meetingSnapshot.id));
   }
 
+  const infosSnapshot = await getDocs(
+    query(
+      collection(db(), "student_infos"),
+      where("student_id", "==", studentId),
+    ),
+  );
+  for (const infoSnapshot of infosSnapshot.docs) {
+    await deleteDoc(doc(db(), "student_infos", infoSnapshot.id));
+  }
+
   await deleteDoc(doc(db(), "students", studentId));
 }
 
@@ -116,6 +126,7 @@ export type MeetingInput = {
   meeting_date: string;
   meeting_time: string;
   meeting_url: string | null;
+  meeting_location: string | null;
   instructions: string | null;
   notes: string | null;
 };
@@ -246,6 +257,59 @@ export async function moveMaterial(
   nextSortOrder: number,
 ): Promise<void> {
   await updateDoc(doc(db(), "materials", materialId), {
+    sort_order: nextSortOrder,
+  });
+}
+
+export type StudentInfoInput = {
+  title: string;
+  content: string | null;
+  url: string | null;
+  url_label: string | null;
+  sort_order: number;
+};
+
+export async function listStudentInfos(
+  studentId: string,
+): Promise<StudentInfo[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db(), "student_infos"),
+      where("student_id", "==", studentId),
+    ),
+  );
+  return snapshot.docs
+    .map((item) => hydrate<StudentInfo>(item))
+    .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+export async function createStudentInfo(
+  studentId: string,
+  input: StudentInfoInput,
+): Promise<void> {
+  await addDoc(collection(db(), "student_infos"), {
+    student_id: studentId,
+    ...input,
+    created_at: serverTimestamp(),
+  });
+}
+
+export async function updateStudentInfo(
+  infoId: string,
+  input: StudentInfoInput,
+): Promise<void> {
+  await updateDoc(doc(db(), "student_infos", infoId), input);
+}
+
+export async function deleteStudentInfo(infoId: string): Promise<void> {
+  await deleteDoc(doc(db(), "student_infos", infoId));
+}
+
+export async function moveStudentInfo(
+  infoId: string,
+  nextSortOrder: number,
+): Promise<void> {
+  await updateDoc(doc(db(), "student_infos", infoId), {
     sort_order: nextSortOrder,
   });
 }
