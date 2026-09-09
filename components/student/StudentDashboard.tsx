@@ -1,25 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, EmptyState, Input, Select } from "@/components/ui";
 import { MeetingCard } from "@/components/student/MeetingCard";
-import { isMeetingUpcoming } from "@/lib/format";
-import type { Meeting, StudentInfo } from "@/lib/types";
+import {
+  currentSchoolYear,
+  isMeetingUpcoming,
+  schoolYearForDate,
+} from "@/lib/format";
+import type { Material, Meeting, StudentInfo } from "@/lib/types";
 
 type StudentDashboardProps = {
   studentToken: string;
   firstName: string;
   meetings: Meeting[];
   infos: StudentInfo[];
+  materials: Material[];
 };
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 export function StudentDashboard({
   studentToken,
   firstName,
   meetings,
   infos,
+  materials,
 }: StudentDashboardProps) {
   const [mounted, setMounted] = useState(false);
+  const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
+  const [order, setOrder] = useState<"desc" | "asc">("desc");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -32,7 +48,49 @@ export function StudentDashboard({
     };
   }, []);
 
-  const upcoming = meetings
+  const availableYears = Array.from(
+    new Set([
+      currentSchoolYear(),
+      ...meetings.map((meeting) => schoolYearForDate(meeting.meeting_date)),
+    ]),
+  ).sort((a, b) => b.localeCompare(a));
+
+  const meetingsInYear = meetings.filter(
+    (meeting) => schoolYearForDate(meeting.meeting_date) === schoolYear,
+  );
+
+  const terms = normalizeSearchText(query.trim())
+    .split(/\s+/)
+    .filter(Boolean);
+  const isSearching = terms.length > 0;
+
+  const searchResults = meetingsInYear.filter((meeting) => {
+    const meetingText = normalizeSearchText(
+      [meeting.instructions, meeting.notes, meeting.meeting_location]
+        .filter(Boolean)
+        .join(" "),
+    );
+    const meetingMaterials = materials.filter(
+      (material) => material.meeting_id === meeting.id,
+    );
+    const materialsText = normalizeSearchText(
+      meetingMaterials
+        .flatMap((material) => [material.title, material.description])
+        .filter(Boolean)
+        .join(" "),
+    );
+    const haystack = `${meetingText} ${materialsText}`;
+    return terms.every((term) => haystack.includes(term));
+  });
+
+  const sortedSearchResults = [...searchResults].sort((a, b) => {
+    const left = `${a.meeting_date}T${a.meeting_time}`;
+    const right = `${b.meeting_date}T${b.meeting_time}`;
+    const compared = left.localeCompare(right);
+    return order === "desc" ? compared * -1 : compared;
+  });
+
+  const upcoming = meetingsInYear
     .filter((meeting) => isMeetingUpcoming(meeting))
     .sort((a, b) =>
       `${a.meeting_date}T${a.meeting_time}`.localeCompare(
@@ -40,7 +98,7 @@ export function StudentDashboard({
       ),
     );
 
-  const past = meetings
+  const past = meetingsInYear
     .filter((meeting) => !isMeetingUpcoming(meeting))
     .sort((a, b) =>
       `${b.meeting_date}T${b.meeting_time}`.localeCompare(
@@ -85,45 +143,126 @@ export function StudentDashboard({
       ) : null}
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">Twoje spotkania</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-zinc-900">
+            Twoje spotkania
+          </h2>
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
+            Rok szkolny
+            <Select
+              value={schoolYear}
+              onChange={(event) => setSchoolYear(event.target.value)}
+              className="w-44"
+              aria-label="Rok szkolny"
+            >
+              {availableYears.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </Select>
+          </label>
+        </div>
 
-        {mounted && meetings.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState>Nie masz jeszcze żadnych spotkań.</EmptyState>
+        <div className="mt-4">
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Szukaj lekcji, np. ułamki, Past Simple…"
+            aria-label="Szukaj lekcji"
+          />
+        </div>
+
+        {isSearching ? (
+          <div className="mt-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-zinc-500">
+                {sortedSearchResults.length === 1
+                  ? "1 znalezione spotkanie"
+                  : `${sortedSearchResults.length} znalezionych spotkań`}
+              </p>
+              <label className="flex items-center gap-2 text-sm text-zinc-600">
+                Sortowanie
+                <Select
+                  value={order}
+                  onChange={(event) =>
+                    setOrder(event.target.value as "desc" | "asc")
+                  }
+                  className="w-44"
+                  aria-label="Sortowanie wyników"
+                >
+                  <option value="desc">Od najnowszych</option>
+                  <option value="asc">Od najstarszych</option>
+                </Select>
+              </label>
+            </div>
+
+            {sortedSearchResults.length === 0 ? (
+              <div className="mt-4">
+                <EmptyState>
+                  Brak spotkań pasujących do „{query.trim()}”.
+                </EmptyState>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {sortedSearchResults.map((meeting) => (
+                  <MeetingCard
+                    key={meeting.id}
+                    meeting={meeting}
+                    studentToken={studentToken}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
 
-        {mounted && upcoming.length > 0 ? (
-          <div className="mt-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Nadchodzące spotkania
-            </h3>
-            <div className="mt-3 space-y-3">
-              {upcoming.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  studentToken={studentToken}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
+        {!isSearching ? (
+          <div className="mt-5">
+            {mounted && meetingsInYear.length === 0 ? (
+              <div className="mt-4">
+                <EmptyState>
+                  {meetings.length === 0
+                    ? "Nie masz jeszcze żadnych spotkań."
+                    : `Brak spotkań w roku szkolnym ${schoolYear}.`}
+                </EmptyState>
+              </div>
+            ) : null}
 
-        {mounted && past.length > 0 ? (
-          <div className="mt-8">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Wcześniejsze spotkania
-            </h3>
-            <div className="mt-3 space-y-3">
-              {past.map((meeting) => (
-                <MeetingCard
-                  key={meeting.id}
-                  meeting={meeting}
-                  studentToken={studentToken}
-                />
-              ))}
-            </div>
+            {mounted && upcoming.length > 0 ? (
+              <div className="mt-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Nadchodzące spotkania
+                </h3>
+                <div className="mt-3 space-y-3">
+                  {upcoming.map((meeting) => (
+                    <MeetingCard
+                      key={meeting.id}
+                      meeting={meeting}
+                      studentToken={studentToken}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {mounted && past.length > 0 ? (
+              <div className="mt-8">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Wcześniejsze spotkania
+                </h3>
+                <div className="mt-3 space-y-3">
+                  {past.map((meeting) => (
+                    <MeetingCard
+                      key={meeting.id}
+                      meeting={meeting}
+                      studentToken={studentToken}
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>

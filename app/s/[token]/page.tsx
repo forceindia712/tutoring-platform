@@ -5,6 +5,7 @@ import {
   findStudentByToken,
   getStudentInfos,
   getStudentMeetings,
+  getMaterialsForMeeting,
 } from "@/lib/data/student";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function StudentPanelPage({
   let student: Awaited<ReturnType<typeof findStudentByToken>> = null;
   let meetings: Awaited<ReturnType<typeof getStudentMeetings>> = [];
   let infos: Awaited<ReturnType<typeof getStudentInfos>> = [];
+  let materials: Awaited<ReturnType<typeof getMaterialsForMeeting>> = [];
   let fetchFailed = false;
 
   if (!/^[a-zA-Z0-9]{6,40}$/.test(token)) {
@@ -42,6 +44,13 @@ export default async function StudentPanelPage({
       ]);
       meetings = studentMeetings;
       infos = studentInfos;
+      materials = (
+        await Promise.all(
+          studentMeetings.map((meeting) =>
+            getMaterialsForMeeting(meeting.id),
+          ),
+        )
+      ).flat();
     }
   } catch {
     fetchFailed = true;
@@ -71,6 +80,7 @@ export default async function StudentPanelPage({
       firstName={student.first_name}
       meetings={meetings}
       infos={infos}
+      materials={materials}
     />
   );
 }

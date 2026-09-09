@@ -138,6 +138,7 @@ Otwórz [http://localhost:3000](http://localhost:3000).
 1. Uczeń wpisuje imię i nazwisko na stronie głównej.
 2. Serwer porównuje dane bez polskich znaków i wielkości liter, a następnie przekierowuje na indywidualny adres `/s/[token]`.
 3. Uczeń widzi nadchodzące i wcześniejsze spotkania. Po otwarciu spotkania widzi instrukcje, notatkę i materiały.
+4. Uczeń może przełączać rok szkolny, szukać lekcji po instrukcjach i materiałach oraz sortować wyniki.
 
 ### Link ucznia
 
