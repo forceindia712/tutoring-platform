@@ -29,11 +29,15 @@ export function StudentLogin() {
     setLoading(true);
     setError(null);
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 20000);
+
     try {
       const response = await fetch("/api/student/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fullName: name }),
+        signal: controller.signal,
       });
       const result = (await response.json()) as LookupResponse;
 
@@ -44,9 +48,10 @@ export function StudentLogin() {
       setError(result.message || NOT_FOUND_MESSAGE);
     } catch {
       setError(
-        "Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.",
+        "Serwer nie odpowiada lub nie udało się połączyć z bazą. Spróbuj ponownie za chwilę.",
       );
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }
