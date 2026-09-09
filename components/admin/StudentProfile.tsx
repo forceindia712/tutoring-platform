@@ -11,6 +11,10 @@ import {
   ErrorNote,
   Select,
 } from "@/components/ui";
+import {
+  StatusFilterChips,
+  type MeetingStatusFilter,
+} from "@/components/StatusFilterChips";
 import { StudentForm } from "@/components/admin/StudentForm";
 import { StudentLink } from "@/components/admin/StudentLink";
 import { StudentInfosManager } from "@/components/admin/StudentInfosManager";
@@ -19,6 +23,7 @@ import { studentFullName } from "@/lib/admin";
 import {
   currentSchoolYear,
   formatDateTime,
+  isMeetingUpcoming,
   schoolYearForDate,
 } from "@/lib/format";
 import type { Meeting, Student } from "@/lib/types";
@@ -30,6 +35,8 @@ export function StudentProfile({ studentId }: { studentId: string }) {
   const [editing, setEditing] = useState(false);
   const [meetingOrder, setMeetingOrder] = useState<"desc" | "asc">("desc");
   const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
+  const [statusFilter, setStatusFilter] =
+    useState<MeetingStatusFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -96,7 +103,13 @@ export function StudentProfile({ studentId }: { studentId: string }) {
     (meeting) => schoolYearForDate(meeting.meeting_date) === schoolYear,
   );
 
-  const sortedMeetings = [...meetingsInYear].sort((a, b) => {
+  const statusFilteredMeetings = meetingsInYear.filter((meeting) =>
+    statusFilter === "all"
+      ? true
+      : isMeetingUpcoming(meeting) === (statusFilter === "upcoming"),
+  );
+
+  const sortedMeetings = [...statusFilteredMeetings].sort((a, b) => {
     const left = `${a.meeting_date}T${a.meeting_time}`;
     const right = `${b.meeting_date}T${b.meeting_time}`;
     return meetingOrder === "desc"
@@ -211,6 +224,13 @@ export function StudentProfile({ studentId }: { studentId: string }) {
           </div>
         </div>
 
+        <div className="mt-3">
+          <StatusFilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
         {meetings.length === 0 ? (
           <div className="mt-4">
             <EmptyState>Ten uczeń nie ma jeszcze żadnych spotkań.</EmptyState>
@@ -219,6 +239,12 @@ export function StudentProfile({ studentId }: { studentId: string }) {
           <div className="mt-4">
             <EmptyState>
               Brak spotkań ucznia w roku szkolnym {schoolYear}.
+            </EmptyState>
+          </div>
+        ) : statusFilteredMeetings.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState>
+              Brak spotkań pasujących do tego filtra w roku {schoolYear}.
             </EmptyState>
           </div>
         ) : (

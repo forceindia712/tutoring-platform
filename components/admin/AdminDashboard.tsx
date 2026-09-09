@@ -5,6 +5,10 @@ import { useEffect, useState } from "react";
 import { Card, ErrorNote, Select } from "@/components/ui";
 import { LessonSearch } from "@/components/admin/LessonSearch";
 import {
+  StatusFilterChips,
+  type MeetingStatusFilter,
+} from "@/components/StatusFilterChips";
+import {
   listAllMaterials,
   listAllMeetings,
   listStudents,
@@ -13,7 +17,9 @@ import { studentFullName } from "@/lib/admin";
 import {
   currentSchoolYear,
   dayLabel,
+  formatDateTime,
   formatTime,
+  isMeetingUpcoming,
   schoolYearForDate,
 } from "@/lib/format";
 import type { Material, Meeting, Student } from "@/lib/types";
@@ -29,6 +35,8 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
+  const [statusFilter, setStatusFilter] =
+    useState<MeetingStatusFilter>("upcoming");
 
   useEffect(() => {
     let active = true;
@@ -75,25 +83,36 @@ export function AdminDashboard() {
     meetingsInYearIds.has(material.meeting_id),
   );
 
-  const upcomingMeetings = meetingsInYear
-    .filter((meeting) => meeting.meeting_date >= todayKey)
-    .sort((a, b) =>
-      `${a.meeting_date}T${a.meeting_time}`.localeCompare(
-        `${b.meeting_date}T${b.meeting_time}`,
-      ),
-    )
-    .slice(0, 8);
-
   const recentMaterials = [...materialsInYear]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 6);
 
-  const groupedUpcoming = new Map<string, Meeting[]>();
-  for (const meeting of upcomingMeetings) {
-    const group = groupedUpcoming.get(meeting.meeting_date) ?? [];
+  const plannedMeetings = meetingsInYear
+    .filter((meeting) => isMeetingUpcoming(meeting))
+    .sort((a, b) =>
+      `${a.meeting_date}T${a.meeting_time}`.localeCompare(
+        `${b.meeting_date}T${b.meeting_time}`,
+      ),
+    );
+
+  const groupedPlanned = new Map<string, Meeting[]>();
+  for (const meeting of plannedMeetings) {
+    const group = groupedPlanned.get(meeting.meeting_date) ?? [];
     group.push(meeting);
-    groupedUpcoming.set(meeting.meeting_date, group);
+    groupedPlanned.set(meeting.meeting_date, group);
   }
+
+  const statusMeetings = meetingsInYear
+    .filter((meeting) =>
+      statusFilter === "all"
+        ? true
+        : isMeetingUpcoming(meeting) === (statusFilter === "upcoming"),
+    )
+    .sort((a, b) =>
+      `${b.meeting_date}T${b.meeting_time}`.localeCompare(
+        `${a.meeting_date}T${a.meeting_time}`,
+      ),
+    );
 
   const materialLabel = (type: string) =>
     type === "file"
@@ -174,16 +193,27 @@ export function AdminDashboard() {
       />
 
       <section className="mt-10">
-        <h2 className="text-lg font-semibold text-zinc-900">
-          Najbliższe spotkania
-        </h2>
-        {upcomingMeetings.length === 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-zinc-900">
+            {statusFilter === "upcoming"
+              ? "Zaplanowane spotkania"
+              : statusFilter === "past"
+                ? "Wcześniejsze spotkania"
+                : `Spotkania w roku ${schoolYear}`}
+          </h2>
+          <StatusFilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
+        {statusMeetings.length === 0 ? (
           <Card className="mt-4 p-6 text-sm text-zinc-500">
-            Brak nadchodzących spotkań.
+            Brak spotkań dla wybranego filtra.
           </Card>
-        ) : (
+        ) : statusFilter === "upcoming" ? (
           <div className="mt-4 space-y-5">
-            {[...groupedUpcoming.entries()].map(([date, meetingsOnDay]) => (
+            {[...groupedPlanned.entries()].map(([date, meetingsOnDay]) => (
               <div key={date}>
                 <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
                   {dayLabel(date)}
@@ -212,6 +242,38 @@ export function AdminDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {statusMeetings.map((meeting) => {
+              const student = studentById(students, meeting.student_id);
+              return (
+                <Link
+                  key={meeting.id}
+                  href={`/admin/meetings/${meeting.id}`}
+                  className="flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white px-4 py-3 transition-colors hover:bg-zinc-50 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-medium text-zinc-900">
+                      {student ? studentFullName(student) : "Uczeń"}
+                    </span>
+                    <span className="mt-0.5 block text-sm text-zinc-500">
+                      {formatDateTime(
+                        meeting.meeting_date,
+                        meeting.meeting_time,
+                      )}
+                      {!meeting.meeting_url ? " · Stacjonarne" : ""}
+                      {meeting.meeting_location
+                        ? ` · ${meeting.meeting_location}`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-sm text-zinc-500">
+                    Spotkanie #{meeting.meeting_number}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

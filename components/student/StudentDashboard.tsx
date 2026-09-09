@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Input, Select } from "@/components/ui";
+import {
+  StatusFilterChips,
+  type MeetingStatusFilter,
+} from "@/components/StatusFilterChips";
 import { MeetingCard } from "@/components/student/MeetingCard";
 import {
   currentSchoolYear,
@@ -36,6 +40,8 @@ export function StudentDashboard({
   const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
   const [order, setOrder] = useState<"desc" | "asc">("desc");
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<MeetingStatusFilter>("all");
 
   useEffect(() => {
     let active = true;
@@ -90,9 +96,13 @@ export function StudentDashboard({
     return order === "desc" ? compared * -1 : compared;
   }
 
-  const visibleMeetings = isSearching
-    ? [...searchResults].sort(byOrder)
-    : [...meetingsInYear].sort(byOrder);
+  const candidateMeetings = isSearching ? searchResults : meetingsInYear;
+  const statusFilteredMeetings = candidateMeetings.filter((meeting) =>
+    statusFilter === "all"
+      ? true
+      : isMeetingUpcoming(meeting) === (statusFilter === "upcoming"),
+  );
+  const visibleMeetings = [...statusFilteredMeetings].sort(byOrder);
 
   function statusLabel(meeting: Meeting): string {
     return isMeetingUpcoming(meeting) ? "Nadchodzące" : "Wcześniejsze";
@@ -166,6 +176,13 @@ export function StudentDashboard({
           />
         </div>
 
+        <div className="mt-4">
+          <StatusFilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-zinc-500">
             {isSearching
@@ -197,7 +214,9 @@ export function StudentDashboard({
                 ? `Brak spotkań pasujących do „${query.trim()}”.`
                 : meetings.length === 0
                   ? "Nie masz jeszcze żadnych spotkań."
-                  : `Brak spotkań w roku szkolnym ${schoolYear}.`}
+                  : candidateMeetings.length === 0
+                    ? `Brak spotkań w roku szkolnym ${schoolYear}.`
+                    : `Brak spotkań pasujących do filtra w roku ${schoolYear}.`}
             </EmptyState>
           </div>
         ) : null}
