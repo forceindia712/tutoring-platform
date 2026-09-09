@@ -1,13 +1,13 @@
 import { Card } from "@/components/ui";
 import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
-import type { MaterialWithFileUrl } from "@/lib/data/student";
+import type { Material } from "@/lib/types";
 
 type MaterialCardProps = {
-  material: MaterialWithFileUrl;
+  material: Material;
   index: number;
 };
 
-function actionForMaterial(material: MaterialWithFileUrl) {
+function actionForMaterial(material: Material) {
   if (material.type === "link" && material.url) {
     return (
       <a
@@ -22,10 +22,10 @@ function actionForMaterial(material: MaterialWithFileUrl) {
   }
 
   if (material.type === "file") {
-    if (material.download_url) {
+    if (material.url) {
       return (
         <a
-          href={material.download_url}
+          href={material.url}
           target="_blank"
           rel="noopener noreferrer"
           className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-900"

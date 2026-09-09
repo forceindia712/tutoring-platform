@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { MeetingDetails } from "@/components/student/MeetingDetails";
 import { StudentMessage } from "@/components/student/StudentMessage";
 import {
-  addFileUrls,
   findStudentByToken,
   getMaterialsForMeeting,
   getMeetingForStudent,
@@ -39,9 +38,7 @@ export default async function StudentMeetingPage({
     meeting = student
       ? await getMeetingForStudent(student.id, meetingId)
       : null;
-    materials = meeting
-      ? await addFileUrls(await getMaterialsForMeeting(meeting.id))
-      : [];
+    materials = meeting ? await getMaterialsForMeeting(meeting.id) : [];
   } catch {
     fetchFailed = true;
   }

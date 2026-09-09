@@ -1,13 +1,12 @@
 import { BackLink, buttonClassName, Card, EmptyState } from "@/components/ui";
 import { MaterialCard } from "@/components/student/MaterialCard";
 import { formatDateTime } from "@/lib/format";
-import type { MaterialWithFileUrl } from "@/lib/data/student";
-import type { Meeting } from "@/lib/types";
+import type { Material, Meeting } from "@/lib/types";
 
 type MeetingDetailsProps = {
   studentToken: string;
   meeting: Meeting;
-  materials: MaterialWithFileUrl[];
+  materials: Material[];
 };
 
 export function MeetingDetails({

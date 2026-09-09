@@ -1,8 +1,6 @@
-export const STORAGE_MATERIALS_PREFIX = "materials";
-
 export const MATERIAL_TYPES = [
   { value: "link", label: "Link" },
-  { value: "file", label: "Plik" },
+  { value: "file", label: "Plik (link)" },
   { value: "text", label: "Tekst" },
   { value: "assignment", label: "Zadanie" },
   { value: "note", label: "Notatka" },
@@ -10,7 +8,7 @@ export const MATERIAL_TYPES = [
 
 export const MATERIAL_TYPE_LABELS: Record<string, string> = {
   link: "Link",
-  file: "Plik",
+  file: "Plik (link)",
   text: "Tekst",
   assignment: "Zadanie",
   note: "Notatka",

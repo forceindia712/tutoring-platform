@@ -6,8 +6,10 @@ Minimalistyczna aplikacja internetowa dla nauczyciela i uczniów. Nauczyciel dod
 
 - [Next.js](https://nextjs.org) 16 (App Router) + TypeScript
 - Tailwind CSS 4
-- Firebase: Firestore (baza danych), Firebase Auth (logowanie nauczyciela), Firebase Storage (pliki)
+- Firebase: Firestore (baza danych) i Firebase Auth (logowanie nauczyciela)
 - Vercel – hosting
+
+Aplikacja **nie używa Firebase Storage**. Materiały „Plik” to po prostu linki – np. do pliku udostępnionego z Google Drive. Dzięki temu nie trzeba włączać płatnego planu ani podpinać karty.
 
 ## Jak działa bezpieczeństwo
 
@@ -17,7 +19,7 @@ Firestore ma reguły bezpieczeństwa z pliku [`firestore.rules`](firestore.rules
 - dane może czytać i zapisywać wyłącznie nauczyciel – sprawdzany po adresie e-mail w regułach;
 - uczeń nie łączy się z Firestore bezpośrednio. Jego strony (`/s/[token]`) czyta serwer Next.js przez Firebase Admin SDK i zawsze filtruje dane po `student_access_token`.
 
-Reguły Storage w [`storage.rules`](storage.rules) pozwalają wgrywać pliki tylko zalogowanemu nauczycielowi. Uczeń pobiera pliki przez linki zapisane w Firestore (linki z tokenem pobierania), więc nie potrzebuje konta.
+Materiały plikowe nie trafiają do aplikacji – nauczyciel wkleja link do pliku (np. z Google Drive), a uczeń otwiera ten link. Żadne pliki nie są przechowywane ani pobierane przez Twoją bazę.
 
 ## Struktura projektu
 
@@ -39,22 +41,23 @@ components/
 lib/
   firebase/ – konfiguracja Firebase, Firebase Admin, warstwa dostępu do Firestore
   data/     – bezpieczne odczyty danych ucznia po tokenie (serwer)
-firestore.rules  – reguły bezpieczeństwa Firestore
-storage.rules    – reguły bezpieczeństwa Storage
+firestore.rules – reguły bezpieczeństwa Firestore
 ```
 
 ## Wymagania
 
 - Node.js 20.9+
-- konto [Firebase](https://firebase.google.com) (plan Spark wystarczy na start)
+- konto [Firebase](https://firebase.google.com) – plan Spark (darmowy) wystarczy, bez karty płatniczej
 - konto [Vercel](https://vercel.com)
 
 ## 1. Konfiguracja Firebase
 
 1. Załóż projekt w konsoli Firebase.
 2. Otwórz **Build → Firestore Database** i kliknij **Create database** (tryb produkcyjny, region np. `europe-west3`).
-3. W plikach [`firestore.rules`](firestore.rules) i [`storage.rules`](storage.rules) zamień przykładowy `teacher@example.com` na adres e-mail nauczyciela.
-4. W konsoli opublikuj reguły: **Firestore → Rules** oraz **Storage → Rules**.
+3. W pliku [`firestore.rules`](firestore.rules) zamień przykładowy `teacher@example.com` na adres e-mail nauczyciela.
+4. W konsoli opublikuj reguły: **Firestore → Rules**.
+
+Firebase Storage **nie włączamy** – aplikacja go nie używa.
 
 ## 2. Tworzenie danych w Firestore
 
@@ -71,19 +74,21 @@ meetings
 
 materials
   id, meeting_id, type, title, description, url,
-  file_url, file_path, sort_order, created_at
+  sort_order, created_at
 ```
+
+Pole `url` służy zarówno typowi „Link”, jak i „Plik” – w obu przypadkach nauczyciel zapisuje adres strony lub udostępnionego pliku.
 
 ## 3. Firebase Auth (tylko nauczyciel)
 
 1. W Firebase otwórz **Build → Authentication → Sign-in method** i włącz **Email/Password**.
 2. W **Users** kliknij **Add user** i załóż konto nauczyciela (e-mail + hasło). Użyj dokładnie tego adresu, który wpisałeś do reguł bezpieczeństwa.
-3. Reguły Firestore i Storage przepuszczają tylko tego jednego nauczyciela – nawet gdyby ktoś ręcznie założył sobie konto, nie zobaczy danych.
+3. Reguły Firestore przepuszczają tylko tego jednego nauczyciela – nawet gdyby ktoś ręcznie założył sobie konto, nie zobaczy danych.
 
 ## 4. Aplikacja webowa i zmienne środowiskowe
 
 1. W **Project settings → General → Your apps** kliknij ikonę `</>` (Web).
-2. Zarejestruj aplikację i skopiuj obiekt konfiguracji (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`).
+2. Zarejestruj aplikację i skopiuj z konsoli: `apiKey`, `authDomain`, `projectId`, `messagingSenderId`, `appId`. Pole `storageBucket` nie jest potrzebne.
 3. W **Project settings → Service accounts** kliknij **Generate new private key** – pobierzesz JSON konta serwisowego.
 
 Skopiuj `.env.example` do `.env.local`:
@@ -92,7 +97,6 @@ Skopiuj `.env.example` do `.env.local`:
 NEXT_PUBLIC_FIREBASE_API_KEY=
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 
@@ -146,15 +150,25 @@ Po zalogowaniu możesz:
 - kopiować indywidualny link ucznia;
 - tworzyć spotkania (numer domyślnie wyliczany jako następny);
 - edytować daty, godziny, linki online, instrukcje i notatki;
-- dodawać do spotkania materiały: link, plik, tekst, zadanie lub notatkę;
+- dodawać do spotkania materiały: link, plik (link np. z Google Drive), tekst, zadanie lub notatkę;
 - edytować, usuwać i zmieniać kolejność materiałów.
+
+### Materiały „Plik” jako linki
+
+Typ „Plik” nie wgrywa pliku do aplikacji. Wystarczy udostępnić plik w Google Drive (lub innej usłudze):
+
+1. Google Drive → prawy przycisk na pliku → **Udostępnij**.
+2. Wybierz „Każdy, kto ma link” i skopiuj link.
+3. Wklej ten link w formularzu materiału.
+
+Uczeń zobaczy przy materiale przycisk „Otwórz plik”.
 
 ## 7. Deployment na Vercel
 
 1. Wrzuć projekt na GitHub.
 2. W Vercel: **Add New → Project** i wybierz repozytorium.
 3. Framework wykryje się automatycznie (Next.js).
-4. Dodaj dziewięć zmiennych środowiskowych z sekcji 4 (wartości z Firebase).
+4. Dodaj osiem zmiennych środowiskowych z sekcji 4 (wartości z Firebase).
 5. Kliknij **Deploy**.
 
 Gotowe. Panel nauczyciela znajdziesz pod `https://twojadomena.pl/admin`.
@@ -173,10 +187,10 @@ git push -u origin main
 ## Uwagi o bezpieczeństwie
 
 - Klucze konta serwisowego (`FIREBASE_*`) są używane tylko w kodzie serwerowym; nie ma ich w bundle'u klienckim.
-- Firestore i Storage mają włączone reguły bezpieczeństwa – niezalogowany uczeń nie może odczytać bazy ani listy uczniów.
+- Firestore ma włączone reguły bezpieczeństwa – niezalogowany uczeń nie może odczytać bazy ani listy uczniów.
 - Panel `/admin` jest chroniony przez Firebase Auth i sprawdzany przy wejściu przez komponent `AdminGate`.
 - Imię i nazwisko nie jest przekazywane w URL – po zalogowaniu aplikacja używa losowego tokenu ucznia.
-- Pliki wgrywane są do prywatnego Storage, a uczeń pobiera je po linkach z tokenem pobierania.
+- Aplikacja nie przechowuje plików ani ich nie pobiera – materiały plikowe to linki (np. Google Drive), więc Firebase Storage nie jest potrzebny i nie trzeba podpinać karty.
 
 ## Możliwe rozszerzenia
 

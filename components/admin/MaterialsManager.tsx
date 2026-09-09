@@ -7,7 +7,6 @@ import {
   deleteMaterial,
   listMaterialsForMeeting,
   moveMaterial,
-  removeStorageFile,
 } from "@/lib/firebase/clientDb";
 import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
 import type { Material } from "@/lib/types";
@@ -53,9 +52,6 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
 
     setError(null);
     try {
-      if (material.file_path) {
-        await removeStorageFile(material.file_path).catch(() => undefined);
-      }
       await deleteMaterial(material.id);
       setMaterials((current) =>
         current.filter((item) => item.id !== material.id),
@@ -159,11 +155,6 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
                 {material.description ? (
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
                     {material.description}
-                  </p>
-                ) : null}
-                {material.file_path ? (
-                  <p className="mt-1 truncate font-mono text-xs text-zinc-400">
-                    {material.file_path}
                   </p>
                 ) : null}
               </div>

@@ -70,17 +70,4 @@ export async function getMaterialsForMeeting(
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
-export type MaterialWithFileUrl = Material & {
-  download_url?: string | null;
-};
-
-export async function addFileUrls(
-  materials: Material[],
-): Promise<MaterialWithFileUrl[]> {
-  return materials.map((material) => ({
-    ...material,
-    download_url: material.type === "file" ? material.file_url : null,
-  }));
-}
-
 export { normalizeName, normalizedFullName } from "@/lib/names";

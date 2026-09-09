@@ -30,8 +30,6 @@ export type Material = {
   title: string;
   description: string | null;
   url: string | null;
-  file_url: string | null;
-  file_path?: string | null;
   sort_order: number;
   created_at: string;
 };

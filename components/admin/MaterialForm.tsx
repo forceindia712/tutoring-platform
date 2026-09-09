@@ -12,9 +12,7 @@ import {
 } from "@/components/ui";
 import {
   createMaterial,
-  removeStorageFile,
   updateMaterial,
-  uploadMaterialFile,
 } from "@/lib/firebase/clientDb";
 import { MATERIAL_TYPES } from "@/lib/constants";
 import type { Material, MaterialType } from "@/lib/types";
@@ -41,7 +39,6 @@ export function MaterialForm({
   const [title, setTitle] = useState(material?.title ?? "");
   const [description, setDescription] = useState(material?.description ?? "");
   const [url, setUrl] = useState(material?.url ?? "");
-  const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -50,30 +47,13 @@ export function MaterialForm({
     setSaving(true);
     setError(null);
 
-    let oldPath: string | null = null;
-
     try {
-      let fileUrl = material?.file_url ?? null;
-      let filePath = material?.file_path ?? null;
-
-      if (type === "file" && file) {
-        const uploaded = await uploadMaterialFile(meetingId, file);
-        oldPath = material?.file_path ?? null;
-        fileUrl = uploaded.downloadUrl;
-        filePath = uploaded.path;
-      } else if (type !== "file") {
-        oldPath = material?.file_path ?? null;
-        fileUrl = null;
-        filePath = null;
-      }
-
+      const isLinkLike = type === "link" || type === "file";
       const payload = {
         type,
         title: title.trim(),
         description: description.trim() || null,
-        url: type === "link" ? url.trim() || null : null,
-        file_url: fileUrl,
-        file_path: filePath,
+        url: isLinkLike ? url.trim() || null : null,
         sort_order: material?.sort_order ?? sortOrder ?? 1,
       };
 
@@ -81,10 +61,6 @@ export function MaterialForm({
         await updateMaterial(material.id, payload);
       } else {
         await createMaterial(meetingId, payload);
-      }
-
-      if (oldPath) {
-        await removeStorageFile(oldPath).catch(() => undefined);
       }
 
       onSaved();
@@ -101,6 +77,7 @@ export function MaterialForm({
 
   const isTextType =
     type === "text" || type === "assignment" || type === "note";
+  const isLinkLike = type === "link" || type === "file";
 
   return (
     <form
@@ -162,8 +139,16 @@ export function MaterialForm({
         />
       </Field>
 
-      {type === "link" ? (
-        <Field label="URL" htmlFor="material-url">
+      {isLinkLike ? (
+        <Field
+          label={type === "file" ? "Link do pliku" : "URL"}
+          htmlFor="material-url"
+          hint={
+            type === "file"
+              ? "Wklej link do pliku, np. z Google Drive (udostępnij jako „każdy, kto ma link”)."
+              : "Link do strony, wideo itp."
+          }
+        >
           <Input
             id="material-url"
             type="url"
@@ -172,26 +157,6 @@ export function MaterialForm({
             placeholder="https://…"
             disabled={saving}
             required
-          />
-        </Field>
-      ) : null}
-
-      {type === "file" ? (
-        <Field
-          label="Plik"
-          htmlFor="material-file"
-          hint={
-            material?.file_url && !file
-              ? "Poprzedni plik zostanie zachowany, jeśli nie wybierzesz nowego."
-              : "PDF, DOCX, JPG itp."
-          }
-        >
-          <Input
-            id="material-file"
-            type="file"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            disabled={saving}
-            required={type === "file" && !material?.file_url}
           />
         </Field>
       ) : null}

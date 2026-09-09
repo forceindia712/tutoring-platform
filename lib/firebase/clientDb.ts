@@ -12,19 +12,9 @@ import {
   where,
 } from "firebase/firestore";
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore";
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
-import {
-  getFirebaseStorageClient,
-  getFirestoreClient,
-} from "@/lib/firebase/client";
+import { getFirestoreClient } from "@/lib/firebase/client";
 import { hydrateFromFirestore } from "@/lib/firebase/convert";
 import { normalizedFullName } from "@/lib/names";
-import { STORAGE_MATERIALS_PREFIX } from "@/lib/constants";
 import { generateAccessToken } from "@/lib/token";
 import type { Material, Meeting, Student } from "@/lib/types";
 
@@ -221,8 +211,6 @@ export type MaterialInput = {
   title: string;
   description: string | null;
   url: string | null;
-  file_url: string | null;
-  file_path?: string | null;
   sort_order: number;
 };
 
@@ -241,10 +229,12 @@ export async function updateMaterial(
   materialId: string,
   input: MaterialInput,
 ): Promise<void> {
-  const updates: Record<string, unknown> = { ...input };
-  if (!input.file_url) updates.file_url = deleteField();
-  if (!input.file_path) updates.file_path = deleteField();
-  await updateDoc(doc(db(), "materials", materialId), updates);
+  await updateDoc(doc(db(), "materials", materialId), {
+    ...input,
+    // Czyszczenie legacy pól z Firebase Storage (file_url/file_path).
+    file_url: deleteField(),
+    file_path: deleteField(),
+  });
 }
 
 export async function deleteMaterial(materialId: string): Promise<void> {
@@ -258,33 +248,4 @@ export async function moveMaterial(
   await updateDoc(doc(db(), "materials", materialId), {
     sort_order: nextSortOrder,
   });
-}
-
-export async function uploadMaterialFile(
-  meetingId: string,
-  file: File,
-): Promise<{ downloadUrl: string; path: string }> {
-  const id =
-    (typeof crypto !== "undefined" &&
-      typeof crypto.randomUUID === "function" &&
-      crypto.randomUUID()) ||
-    `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-  const safeName =
-    file.name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "plik";
-  const path = `${STORAGE_MATERIALS_PREFIX}/${meetingId}/${id}-${safeName}`;
-  const storageRef = ref(getFirebaseStorageClient(), path);
-  await uploadBytes(storageRef, file, {
-    contentType: file.type || "application/octet-stream",
-  });
-  const downloadUrl = await getDownloadURL(storageRef);
-  return { downloadUrl, path };
-}
-
-export async function removeStorageFile(path: string): Promise<void> {
-  await deleteObject(ref(getFirebaseStorageClient(), path));
 }
