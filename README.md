@@ -54,7 +54,7 @@ firestore.rules – reguły bezpieczeństwa Firestore
 
 1. Załóż projekt w konsoli Firebase.
 2. Otwórz **Build → Firestore Database** i kliknij **Create database** (tryb produkcyjny, region np. `europe-west3`).
-3. W pliku [`firestore.rules`](firestore.rules) zamień przykładowy `teacher@example.com` na adres e-mail nauczyciela.
+3. W pliku [`firestore.rules`](firestore.rules) upewnij się, że w regule `isTeacher` jest adres e-mail nauczyciela.
 4. W konsoli opublikuj reguły: **Firestore → Rules**.
 
 Firebase Storage **nie włączamy** – aplikacja go nie używa.
