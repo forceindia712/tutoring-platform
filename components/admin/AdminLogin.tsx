@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { onAuthStateChanged, signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Card, ErrorNote, Field, Input } from "@/components/ui";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { getFirebaseAuthClient } from "@/lib/firebase/client";
 
 export function AdminLogin() {
   const router = useRouter();
@@ -17,20 +18,28 @@ export function AdminLogin() {
 
   useEffect(() => {
     let active = true;
-    getSupabaseBrowserClient()
-      .auth.getUser()
-      .then(({ data }) => {
-        if (active && data.user) {
+    try {
+      const unsubscribe = onAuthStateChanged(getFirebaseAuthClient(), (user) => {
+        if (!active) return;
+        if (user) {
           router.replace("/admin/dashboard");
+          return;
         }
-      })
-      .catch(() => undefined)
-      .finally(() => {
         if (active) setChecking(false);
       });
-    return () => {
-      active = false;
-    };
+      return () => {
+        active = false;
+        unsubscribe();
+      };
+    } catch {
+      window.setTimeout(() => {
+        if (!active) return;
+        setError(
+          "Brak konfiguracji Firebase. Dodaj zmienne środowiskowe i odśwież stronę.",
+        );
+        setChecking(false);
+      }, 0);
+    }
   }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -38,19 +47,19 @@ export function AdminLogin() {
     setLoading(true);
     setError(null);
 
-    const { error: signInError } = await getSupabaseBrowserClient().auth
-      .signInWithPassword({
-        email: email.trim(),
+    try {
+      await signInWithEmailAndPassword(
+        getFirebaseAuthClient(),
+        email.trim(),
         password,
-      })
-      .finally(() => setLoading(false));
-
-    if (signInError) {
+      );
+      router.replace("/admin/dashboard");
+      router.refresh();
+    } catch {
       setError("Nieprawidłowy adres e-mail lub hasło.");
-      return;
+    } finally {
+      setLoading(false);
     }
-    router.replace("/admin/dashboard");
-    router.refresh();
   }
 
   if (checking) {

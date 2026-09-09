@@ -1,4 +1,4 @@
-export const MATERIAL_BUCKET = "meeting-materials";
+export const STORAGE_MATERIALS_PREFIX = "materials";
 
 export const MATERIAL_TYPES = [
   { value: "link", label: "Link" },

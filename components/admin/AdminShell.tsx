@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { buttonClassName, cn } from "@/components/ui";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { getFirebaseAuthClient } from "@/lib/firebase/client";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard" },
@@ -18,7 +18,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
   async function handleLogout() {
     setLoggingOut(true);
-    await getSupabaseBrowserClient().auth.signOut();
+    await getFirebaseAuthClient().signOut();
     router.replace("/admin");
     router.refresh();
   }

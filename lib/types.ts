@@ -31,6 +31,7 @@ export type Material = {
   description: string | null;
   url: string | null;
   file_url: string | null;
+  file_path?: string | null;
   sort_order: number;
   created_at: string;
 };

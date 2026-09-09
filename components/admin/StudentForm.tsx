@@ -3,8 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Card, ErrorNote, Field, Input, Textarea } from "@/components/ui";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { generateAccessToken } from "@/lib/token";
+import { createStudent, updateStudent } from "@/lib/firebase/clientDb";
 import type { Student } from "@/lib/types";
 
 type StudentFormProps = {
@@ -27,42 +26,26 @@ export function StudentForm({ student, onSaved, onCancel }: StudentFormProps) {
     setSaving(true);
     setError(null);
 
+    const input = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.trim() || null,
+      notes: notes.trim() || null,
+    };
+
     try {
-      const client = getSupabaseBrowserClient();
-      const payload = {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        email: email.trim() || null,
-        notes: notes.trim() || null,
-      };
-
-      let result;
       if (student) {
-        result = await client
-          .from("students")
-          .update(payload)
-          .eq("id", student.id)
-          .select()
-          .single();
+        await updateStudent(student.id, input);
+        onSaved({
+          ...student,
+          ...input,
+        });
       } else {
-        result = await client
-          .from("students")
-          .insert({
-            ...payload,
-            student_access_token: generateAccessToken(),
-          })
-          .select()
-          .single();
+        const created = await createStudent(input);
+        onSaved(created);
       }
-
-      if (result.error) throw result.error;
-      onSaved(result.data as Student);
-    } catch (err) {
-      setError(
-        err && typeof err === "object" && "message" in err
-          ? "Nie udało się zapisać ucznia. Sprawdź, czy nie ma duplikatu imienia i nazwiska."
-          : "Nie udało się zapisać ucznia.",
-      );
+    } catch {
+      setError("Nie udało się zapisać ucznia. Spróbuj ponownie.");
     } finally {
       setSaving(false);
     }
@@ -119,7 +102,11 @@ export function StudentForm({ student, onSaved, onCancel }: StudentFormProps) {
           </Field>
         </div>
 
-        {error ? <div className="sm:col-span-2"><ErrorNote>{error}</ErrorNote></div> : null}
+        {error ? (
+          <div className="sm:col-span-2">
+            <ErrorNote>{error}</ErrorNote>
+          </div>
+        ) : null}
 
         <div className="flex gap-2 sm:col-span-2">
           <Button type="submit" disabled={saving}>

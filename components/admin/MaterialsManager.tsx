@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { Button, Card, EmptyState, ErrorNote } from "@/components/ui";
 import { MaterialForm } from "@/components/admin/MaterialForm";
-import { MATERIAL_TYPE_LABELS, MATERIAL_BUCKET } from "@/lib/constants";
-import { apiErrorMessage } from "@/lib/admin";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import {
+  deleteMaterial,
+  listMaterialsForMeeting,
+  moveMaterial,
+  removeStorageFile,
+} from "@/lib/firebase/clientDb";
+import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
 import type { Material } from "@/lib/types";
 
 export function MaterialsManager({ meetingId }: { meetingId: string }) {
@@ -15,46 +19,26 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  function queryMaterials() {
-    return getSupabaseBrowserClient()
-      .from("materials")
-      .select("*")
-      .eq("meeting_id", meetingId)
-      .order("sort_order", { ascending: true });
-  }
-
-  function applyMaterialsResult({
-    data,
-    error: loadError,
-  }: Awaited<ReturnType<typeof queryMaterials>>) {
-    if (loadError) {
-      setError(apiErrorMessage(loadError, "Nie udało się pobrać materiałów."));
-    } else {
-      setMaterials((data ?? []) as Material[]);
+  async function load() {
+    try {
+      setMaterials(await listMaterialsForMeeting(meetingId));
+    } catch {
+      setError("Nie udało się pobrać materiałów.");
     }
     setLoading(false);
   }
 
-  async function load() {
-    applyMaterialsResult(await queryMaterials());
-  }
-
   useEffect(() => {
     let active = true;
-    getSupabaseBrowserClient()
-      .from("materials")
-      .select("*")
-      .eq("meeting_id", meetingId)
-      .order("sort_order", { ascending: true })
-      .then(({ data, error: loadError }) => {
+    listMaterialsForMeeting(meetingId)
+      .then((data) => {
         if (!active) return;
-        if (loadError) {
-          setError(
-            apiErrorMessage(loadError, "Nie udało się pobrać materiałów."),
-          );
-        } else {
-          setMaterials((data ?? []) as Material[]);
-        }
+        setMaterials(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Nie udało się pobrać materiałów.");
         setLoading(false);
       });
     return () => {
@@ -67,32 +51,18 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
       return;
     }
 
-    if (material.type === "file" && !window.confirm("Usunąć też plik z Supabase Storage?")) {
-      // Usuwamy wyłącznie wpis materiału.
-      const { error: rowError } = await getSupabaseBrowserClient()
-        .from("materials")
-        .delete()
-        .eq("id", material.id);
-      if (rowError) setError(apiErrorMessage(rowError));
-      else await load();
-      return;
+    setError(null);
+    try {
+      if (material.file_path) {
+        await removeStorageFile(material.file_path).catch(() => undefined);
+      }
+      await deleteMaterial(material.id);
+      setMaterials((current) =>
+        current.filter((item) => item.id !== material.id),
+      );
+    } catch {
+      setError("Nie udało się usunąć materiału.");
     }
-
-    const { error: rowError } = await getSupabaseBrowserClient()
-      .from("materials")
-      .delete()
-      .eq("id", material.id);
-    if (rowError) {
-      setError(apiErrorMessage(rowError, "Nie udało się usunąć materiału."));
-      return;
-    }
-    if (material.file_url) {
-      await getSupabaseBrowserClient()
-        .storage.from(MATERIAL_BUCKET)
-        .remove([material.file_url])
-        .catch(() => undefined);
-    }
-    await load();
   }
 
   async function move(index: number, direction: -1 | 1) {
@@ -102,22 +72,20 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
     const next = materials[target];
     setError(null);
 
-    const updates = await Promise.all([
-      getSupabaseBrowserClient()
-        .from("materials")
-        .update({ sort_order: next.sort_order })
-        .eq("id", current.id),
-      getSupabaseBrowserClient()
-        .from("materials")
-        .update({ sort_order: current.sort_order })
-        .eq("id", next.id),
-    ]);
-
-    if (updates.some((result) => result.error)) {
+    try {
+      await Promise.all([
+        moveMaterial(current.id, next.sort_order),
+        moveMaterial(next.id, current.sort_order),
+      ]);
+      setMaterials((items) => {
+        const copy = [...items];
+        copy[index] = next;
+        copy[target] = current;
+        return copy;
+      });
+    } catch {
       setError("Nie udało się zmienić kolejności materiałów.");
-      return;
     }
-    await load();
   }
 
   return (
@@ -193,14 +161,9 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
                     {material.description}
                   </p>
                 ) : null}
-                {material.url ? (
+                {material.file_path ? (
                   <p className="mt-1 truncate font-mono text-xs text-zinc-400">
-                    {material.url}
-                  </p>
-                ) : null}
-                {material.file_url ? (
-                  <p className="mt-1 truncate font-mono text-xs text-zinc-400">
-                    {material.file_url}
+                    {material.file_path}
                   </p>
                 ) : null}
               </div>

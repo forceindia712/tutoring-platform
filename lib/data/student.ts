@@ -1,111 +1,86 @@
 import "server-only";
 
-import { MATERIAL_BUCKET } from "@/lib/constants";
-import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { getAdminFirestore } from "@/lib/firebase/admin";
+import { hydrateFromFirestore } from "@/lib/firebase/convert";
 import type { Material, Meeting, StudentSummary } from "@/lib/types";
 
-export async function findStudentByToken(token: string): Promise<StudentSummary | null> {
-  const { data, error } = await getSupabaseServiceClient()
-    .from("students")
-    .select("id, first_name, last_name")
-    .eq("student_access_token", token)
-    .maybeSingle();
+export async function findStudentByToken(
+  token: string,
+): Promise<StudentSummary | null> {
+  const snapshot = await getAdminFirestore()
+    .collection("students")
+    .where("student_access_token", "==", token)
+    .limit(1)
+    .get();
 
-  if (error) {
-    throw new Error(`Nie udało się pobrać ucznia: ${error.message}`);
-  }
-  return data;
+  if (snapshot.empty) return null;
+  const data = snapshot.docs[0].data();
+  return {
+    id: snapshot.docs[0].id,
+    first_name: String(data.first_name ?? ""),
+    last_name: String(data.last_name ?? ""),
+  };
 }
 
-export async function getStudentMeetings(studentId: string): Promise<Meeting[]> {
-  const { data, error } = await getSupabaseServiceClient()
-    .from("meetings")
-    .select("*")
-    .eq("student_id", studentId)
-    .order("meeting_date", { ascending: false })
-    .order("meeting_time", { ascending: false });
+export async function getStudentMeetings(
+  studentId: string,
+): Promise<Meeting[]> {
+  const snapshot = await getAdminFirestore()
+    .collection("meetings")
+    .where("student_id", "==", studentId)
+    .get();
 
-  if (error) {
-    throw new Error(`Nie udało się pobrać spotkań: ${error.message}`);
-  }
-  return (data ?? []) as Meeting[];
+  return snapshot.docs
+    .map((meetingSnapshot) =>
+      hydrateFromFirestore<Meeting>(meetingSnapshot),
+    )
+    .sort((a, b) =>
+      `${b.meeting_date}T${b.meeting_time}`.localeCompare(
+        `${a.meeting_date}T${a.meeting_time}`,
+      ),
+    );
 }
 
 export async function getMeetingForStudent(
   studentId: string,
   meetingId: string,
 ): Promise<Meeting | null> {
-  const { data, error } = await getSupabaseServiceClient()
-    .from("meetings")
-    .select("*")
-    .eq("id", meetingId)
-    .eq("student_id", studentId)
-    .maybeSingle();
+  const snapshot = await getAdminFirestore()
+    .collection("meetings")
+    .doc(meetingId)
+    .get();
 
-  if (error) {
-    throw new Error(`Nie udało się pobrać spotkania: ${error.message}`);
-  }
-  return data;
+  if (!snapshot.exists) return null;
+  const meeting = hydrateFromFirestore<Meeting>(snapshot);
+  return meeting.student_id === studentId ? meeting : null;
 }
 
-export async function getMaterialsForMeeting(meetingId: string): Promise<Material[]> {
-  const { data, error } = await getSupabaseServiceClient()
-    .from("materials")
-    .select("*")
-    .eq("meeting_id", meetingId)
-    .order("sort_order", { ascending: true });
+export async function getMaterialsForMeeting(
+  meetingId: string,
+): Promise<Material[]> {
+  const snapshot = await getAdminFirestore()
+    .collection("materials")
+    .where("meeting_id", "==", meetingId)
+    .get();
 
-  if (error) {
-    throw new Error(`Nie udało się pobrać materiałów: ${error.message}`);
-  }
-  return (data ?? []) as Material[];
+  return snapshot.docs
+    .map((materialSnapshot) =>
+      hydrateFromFirestore<Material>(materialSnapshot),
+    )
+    .sort((a, b) => a.sort_order - b.sort_order);
 }
 
-export type MaterialWithFileUrl = Material & { download_url?: string | null };
+export type MaterialWithFileUrl = Material & {
+  download_url?: string | null;
+};
 
 export async function addFileUrls(
   materials: Material[],
 ): Promise<MaterialWithFileUrl[]> {
-  const filePaths = materials
-    .filter((material) => material.type === "file" && material.file_url)
-    .map((material) => material.file_url as string);
-
-  if (filePaths.length === 0) {
-    return materials as MaterialWithFileUrl[];
-  }
-
-  const { data, error } = await getSupabaseServiceClient()
-    .storage.from(MATERIAL_BUCKET)
-    .createSignedUrls(filePaths, 60 * 60 * 6);
-
-  if (error) {
-    throw new Error(`Nie udało się przygotować plików: ${error.message}`);
-  }
-
-  const urlByPath = new Map<string, string>();
-  for (const item of data ?? []) {
-    if (item.signedUrl && item.path) {
-      urlByPath.set(item.path, item.signedUrl);
-    }
-  }
-
-  return materials.map((material) => {
-    const filePath = material.file_url;
-    return {
-      ...material,
-      download_url:
-        material.type === "file" && filePath
-          ? (urlByPath.get(filePath) ?? null)
-          : null,
-    };
-  });
+  return materials.map((material) => ({
+    ...material,
+    download_url: material.type === "file" ? material.file_url : null,
+  }));
 }
 
-export function normalizeName(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, "")
-    .trim();
-}
+export { normalizeName, normalizedFullName } from "@/lib/names";

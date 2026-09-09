@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BackLink, ErrorNote } from "@/components/ui";
 import { MeetingForm } from "@/components/admin/MeetingForm";
-import { apiErrorMessage, studentFullName } from "@/lib/admin";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { getStudent } from "@/lib/firebase/clientDb";
+import { studentFullName } from "@/lib/admin";
 import type { Student } from "@/lib/types";
 
 export function NewMeetingForStudent({ studentId }: { studentId: string }) {
@@ -14,18 +14,17 @@ export function NewMeetingForStudent({ studentId }: { studentId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getSupabaseBrowserClient()
-      .from("students")
-      .select("*")
-      .eq("id", studentId)
-      .single()
-      .then(({ data, error: loadError }) => {
-        if (loadError) {
-          setError(apiErrorMessage(loadError, "Nie znaleziono ucznia."));
-        } else {
-          setStudent(data as Student);
-        }
+    let active = true;
+    getStudent(studentId)
+      .then((data) => {
+        if (active) setStudent(data);
+      })
+      .catch(() => {
+        if (active) setError("Nie znaleziono ucznia.");
       });
+    return () => {
+      active = false;
+    };
   }, [studentId]);
 
   return (

@@ -11,8 +11,13 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { apiErrorMessage, studentFullName, todayDateInputValue } from "@/lib/admin";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import {
+  createMeeting,
+  listMeetingsForStudent,
+  listStudentSummaries,
+  updateMeeting,
+} from "@/lib/firebase/clientDb";
+import { studentFullName, todayDateInputValue } from "@/lib/admin";
 import type { Meeting, Student } from "@/lib/types";
 
 type MeetingFormProps = {
@@ -27,7 +32,9 @@ export function MeetingForm({
   onSaved,
 }: MeetingFormProps) {
   const isEditing = Boolean(meeting);
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<
+    Array<Pick<Student, "id" | "first_name" | "last_name">>
+  >([]);
   const [selectedStudentId, setSelectedStudentId] = useState(
     meeting?.student_id ?? fixedStudent?.id ?? "",
   );
@@ -38,7 +45,9 @@ export function MeetingForm({
   const [date, setDate] = useState(
     meeting?.meeting_date ?? todayDateInputValue(),
   );
-  const [time, setTime] = useState(meeting?.meeting_time.slice(0, 5) ?? "17:00");
+  const [time, setTime] = useState(
+    meeting?.meeting_time.slice(0, 5) ?? "17:00",
+  );
   const [url, setUrl] = useState(meeting?.meeting_url ?? "");
   const [instructions, setInstructions] = useState(
     meeting?.instructions ?? "",
@@ -47,55 +56,34 @@ export function MeetingForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function fetchNextNumber(studentId: string) {
-    const { data, error: fetchError } = await getSupabaseBrowserClient()
-      .from("meetings")
-      .select("meeting_number")
-      .eq("student_id", studentId)
-      .order("meeting_number", { ascending: false })
-      .limit(1);
-
-    if (fetchError) return;
-    const numbers = ((data ?? []) as { meeting_number: number }[]).map(
-      (row) => row.meeting_number,
-    );
-    const max = numbers.length > 0 ? Math.max(...numbers) : 0;
-    setAutoNumber(max + 1);
-  }
-
   useEffect(() => {
-    if (!fixedStudent) {
-      let active = true;
-      getSupabaseBrowserClient()
-        .from("students")
-        .select("id, first_name, last_name")
-        .order("first_name", { ascending: true })
-        .then(({ data }) => {
-          if (active) setStudents((data ?? []) as Student[]);
-        });
-      return () => {
-        active = false;
-      };
-    }
+    if (fixedStudent) return;
+    let active = true;
+    listStudentSummaries()
+      .then((data) => {
+        if (active) setStudents(data);
+      })
+      .catch(() => {
+        if (active) setError("Nie udało się pobrać uczniów.");
+      });
+    return () => {
+      active = false;
+    };
   }, [fixedStudent]);
 
   useEffect(() => {
     if (isEditing || !selectedStudentId) return;
     let active = true;
-    getSupabaseBrowserClient()
-      .from("meetings")
-      .select("meeting_number")
-      .eq("student_id", selectedStudentId)
-      .order("meeting_number", { ascending: false })
-      .limit(1)
-      .then(({ data, error: fetchError }) => {
-        if (!active || fetchError) return;
-        const numbers = ((data ?? []) as { meeting_number: number }[]).map(
-          (row) => row.meeting_number,
-        );
+    listMeetingsForStudent(selectedStudentId)
+      .then((data) => {
+        if (!active) return;
+        const numbers = data.map((item) => item.meeting_number);
         setAutoNumber(
           (numbers.length > 0 ? Math.max(...numbers) : 0) + 1,
         );
+      })
+      .catch(() => {
+        if (active) setError("Nie udało się ustalić numeru spotkania.");
       });
     return () => {
       active = false;
@@ -106,8 +94,14 @@ export function MeetingForm({
     setSelectedStudentId(studentId);
     if (!isEditing) {
       setMeetingNumber("");
-      void fetchNextNumber(studentId);
+      setAutoNumber(null);
     }
+  }
+
+  async function nextNumberFor(studentId: string): Promise<number> {
+    const data = await listMeetingsForStudent(studentId);
+    const numbers = data.map((item) => item.meeting_number);
+    return (numbers.length > 0 ? Math.max(...numbers) : 0) + 1;
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -121,23 +115,9 @@ export function MeetingForm({
     setError(null);
 
     try {
-      let number = meetingNumber
+      const number = meetingNumber
         ? Number.parseInt(meetingNumber, 10)
-        : autoNumber;
-      if (!meetingNumber && !number) {
-        const { data, error: maxError } = await getSupabaseBrowserClient()
-          .from("meetings")
-          .select("meeting_number")
-          .eq("student_id", selectedStudentId)
-          .order("meeting_number", { ascending: false })
-          .limit(1);
-        if (maxError) throw maxError;
-        const numbers = ((data ?? []) as { meeting_number: number }[]).map(
-          (row) => row.meeting_number,
-        );
-        number = (numbers.length > 0 ? Math.max(...numbers) : 0) + 1;
-      }
-
+        : autoNumber ?? (await nextNumberFor(selectedStudentId));
       if (!number || Number.isNaN(number)) {
         setError("Podaj poprawny numer spotkania.");
         return;
@@ -153,30 +133,18 @@ export function MeetingForm({
         notes: notes.trim() || null,
       };
 
-      let result;
       if (meeting) {
-        result = await getSupabaseBrowserClient()
-          .from("meetings")
-          .update(payload)
-          .eq("id", meeting.id)
-          .select()
-          .single();
+        await updateMeeting(meeting.id, payload);
+        onSaved(meeting.id);
       } else {
-        result = await getSupabaseBrowserClient()
-          .from("meetings")
-          .insert(payload)
-          .select()
-          .single();
+        const createdId = await createMeeting(payload);
+        onSaved(createdId);
       }
-
-      if (result.error) throw result.error;
-      onSaved(String((result.data as { id: string }).id));
     } catch (err) {
       setError(
-        apiErrorMessage(
-          err,
-          "Nie udało się zapisać spotkania. Sprawdź, czy numer spotkania nie jest już zajęty.",
-        ),
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Nie udało się zapisać spotkania.",
       );
     } finally {
       setSaving(false);
@@ -315,7 +283,6 @@ export function MeetingForm({
                 ? "Zapisz spotkanie"
                 : "Utwórz spotkanie"}
           </Button>
-          {isEditing ? null : null}
         </div>
       </form>
     </Card>

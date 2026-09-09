@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeName } from "@/lib/data/student";
-import { getSupabaseServiceClient } from "@/lib/supabase/service";
+import { getAdminFirestore } from "@/lib/firebase/admin";
+import { normalizeName } from "@/lib/names";
 
 export async function POST(request: NextRequest) {
   let body: { fullName?: unknown };
@@ -22,37 +22,24 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const normalizedInput = normalizeName(`${words[0]} ${words[words.length - 1]}`);
+  const normalizedInput = normalizeName(
+    `${words[0]} ${words[words.length - 1]}`,
+  );
 
   try {
-    const supabase = getSupabaseServiceClient();
-    const { data, error } = await supabase
-      .from("students")
-      .select("first_name, last_name, student_access_token");
+    const snapshot = await getAdminFirestore()
+      .collection("students")
+      .where("search_name", "==", normalizedInput)
+      .get();
 
-    if (error) {
-      console.error("Student lookup error:", error.message);
-      return NextResponse.json(
-        {
-          ok: false,
-          message:
-            "Nie znaleziono ucznia. Sprawdź wpisane dane lub skontaktuj się z nauczycielem.",
-        },
-        { status: 200 },
-      );
-    }
-
-    const matches = (data ?? []).filter((row) => {
-      const first = String(row.first_name ?? "");
-      const last = String(row.last_name ?? "");
-      return normalizeName(`${first} ${last}`) === normalizedInput;
-    });
+    const matches = snapshot.docs.map((item) => ({
+      student_access_token: String(item.data().student_access_token ?? ""),
+    }));
 
     if (matches.length === 1) {
-      const token = String(matches[0].student_access_token);
       return NextResponse.json({
         ok: true,
-        redirectTo: `/s/${token}`,
+        redirectTo: `/s/${matches[0].student_access_token}`,
       });
     }
 

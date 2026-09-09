@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // WAŻNE: zamień teacher@example.com na e-mail swojego konta nauczyciela.
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'teacher@example.com';
+    }
+
+    // Dane może czytać i zapisywać wyłącznie nauczyciel.
+    // Uczeń nigdy nie łączy się z Firestore bezpośrednio – jego dane
+    // pobiera serwer aplikacji przez Firebase Admin SDK po access tokenie.
+    match /students/{studentId} {
+      allow read, write: if isTeacher();
+    }
+
+    match /meetings/{meetingId} {
+      allow read, write: if isTeacher();
+    }
+
+    match /materials/{materialId} {
+      allow read, write: if isTeacher();
+    }
+  }
+}

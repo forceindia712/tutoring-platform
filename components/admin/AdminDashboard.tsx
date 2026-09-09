@@ -2,107 +2,42 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Card, ErrorNote } from "@/components/ui";
 import {
-  Card,
-  ErrorNote,
-} from "@/components/ui";
-import { toStudentSummary } from "@/lib/admin";
+  listAllMaterials,
+  listAllMeetings,
+  listStudents,
+} from "@/lib/firebase/clientDb";
+import { studentFullName } from "@/lib/admin";
 import { dayLabel, formatTime } from "@/lib/format";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { MeetingWithStudent } from "@/lib/types";
+import type { Material, Meeting, Student } from "@/lib/types";
 
-type RecentMaterial = {
-  id: string;
-  title: string;
-  type: string;
-  created_at: string;
-  meeting:
-    | {
-        id: string;
-        meeting_number: number;
-        student?: unknown;
-      }[]
-    | {
-        id: string;
-        meeting_number: number;
-        student?: unknown;
-      }
-    | null;
-};
-
-function firstRow(value: unknown): Record<string, unknown> | null {
-  if (Array.isArray(value)) return (value[0] as Record<string, unknown>) ?? null;
-  if (value && typeof value === "object") return value as Record<string, unknown>;
-  return null;
+function studentById(students: Student[], id: string): Student | undefined {
+  return students.find((student) => student.id === id);
 }
 
 export function AdminDashboard() {
-  const [studentsCount, setStudentsCount] = useState<number | null>(null);
-  const [upcomingCount, setUpcomingCount] = useState<number | null>(null);
-  const [materialsCount, setMaterialsCount] = useState<number | null>(null);
-  const [upcoming, setUpcoming] = useState<MeetingWithStudent[]>([]);
-  const [recentMaterials, setRecentMaterials] = useState<RecentMaterial[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    const today = new Date();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    const todayKey = `${today.getFullYear()}-${month}-${day}`;
-
-    async function load() {
-      const client = getSupabaseBrowserClient();
-      const [students, upcomingRes, materialsRes, upcomingMeetings, latestMaterials] =
-        await Promise.all([
-          client.from("students").select("*", { count: "exact", head: true }),
-          client
-            .from("meetings")
-            .select("*", { count: "exact", head: true })
-            .gte("meeting_date", todayKey),
-          client
-            .from("materials")
-            .select("*", { count: "exact", head: true }),
-          client
-            .from("meetings")
-            .select(
-              "id, meeting_number, meeting_date, meeting_time, meeting_url, instructions, notes, created_at, updated_at, student_id, student:students(id, first_name, last_name)",
-            )
-            .gte("meeting_date", todayKey)
-            .order("meeting_date", { ascending: true })
-            .order("meeting_time", { ascending: true })
-            .limit(8),
-          client
-            .from("materials")
-            .select(
-              "id, title, type, created_at, meeting:meetings(id, meeting_number, student:students(id, first_name, last_name))",
-            )
-            .order("created_at", { ascending: false })
-            .limit(6),
-        ]);
-
-      if (
-        students.error ||
-        upcomingRes.error ||
-        materialsRes.error ||
-        upcomingMeetings.error ||
-        latestMaterials.error
-      ) {
+    Promise.all([listStudents(), listAllMeetings(), listAllMaterials()])
+      .then(([studentsResult, meetingsResult, materialsResult]) => {
+        if (!active) return;
+        setStudents(studentsResult);
+        setMeetings(meetingsResult);
+        setMaterials(materialsResult);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
         setError("Nie udało się pobrać danych panelu.");
-      } else {
-        setStudentsCount(students.count ?? 0);
-        setUpcomingCount(upcomingRes.count ?? 0);
-        setMaterialsCount(materialsRes.count ?? 0);
-        setUpcoming((upcomingMeetings.data ?? []) as MeetingWithStudent[]);
-        setRecentMaterials(
-          (latestMaterials.data ?? []) as unknown as RecentMaterial[],
-        );
-      }
-      if (active) setLoading(false);
-    }
-
-    void load();
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -113,10 +48,29 @@ export function AdminDashboard() {
     return <p className="text-sm text-zinc-500">Wczytywanie panelu…</p>;
   }
 
-  const groupedUpcoming = new Map<string, MeetingWithStudent[]>();
-  for (const meeting of upcoming) {
-    const key = meeting.meeting_date;
-    groupedUpcoming.set(key, [...(groupedUpcoming.get(key) ?? []), meeting]);
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  const todayKey = `${today.getFullYear()}-${month}-${day}`;
+
+  const upcomingMeetings = meetings
+    .filter((meeting) => meeting.meeting_date >= todayKey)
+    .sort((a, b) =>
+      `${a.meeting_date}T${a.meeting_time}`.localeCompare(
+        `${b.meeting_date}T${b.meeting_time}`,
+      ),
+    )
+    .slice(0, 8);
+
+  const recentMaterials = [...materials]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 6);
+
+  const groupedUpcoming = new Map<string, Meeting[]>();
+  for (const meeting of upcomingMeetings) {
+    const group = groupedUpcoming.get(meeting.meeting_date) ?? [];
+    group.push(meeting);
+    groupedUpcoming.set(meeting.meeting_date, group);
   }
 
   const materialLabel = (type: string) =>
@@ -143,7 +97,7 @@ export function AdminDashboard() {
         <Card className="p-5">
           <p className="text-sm font-medium text-zinc-600">Uczniowie</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {studentsCount}
+            {students.length}
           </p>
           <Link
             href="/admin/students"
@@ -157,13 +111,13 @@ export function AdminDashboard() {
             Nadchodzące spotkania
           </p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {upcomingCount}
+            {meetings.filter((meeting) => meeting.meeting_date >= todayKey).length}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-sm font-medium text-zinc-600">Materiały</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {materialsCount}
+            {materials.length}
           </p>
           <Link
             href="/admin/meetings/new"
@@ -178,7 +132,7 @@ export function AdminDashboard() {
         <h2 className="text-lg font-semibold text-zinc-900">
           Najbliższe spotkania
         </h2>
-        {upcoming.length === 0 ? (
+        {upcomingMeetings.length === 0 ? (
           <Card className="mt-4 p-6 text-sm text-zinc-500">
             Brak nadchodzących spotkań.
           </Card>
@@ -191,7 +145,7 @@ export function AdminDashboard() {
                 </p>
                 <div className="mt-2 space-y-2">
                   {meetingsOnDay.map((meeting) => {
-                    const student = toStudentSummary(meeting.student);
+                    const student = studentById(students, meeting.student_id);
                     return (
                       <Link
                         key={meeting.id}
@@ -201,9 +155,7 @@ export function AdminDashboard() {
                         <span className="font-medium text-zinc-900">
                           {formatTime(meeting.meeting_time)}
                           <span className="mx-2 text-zinc-300">·</span>
-                          {student
-                            ? `${student.first_name} ${student.last_name}`
-                            : "Uczeń"}
+                          {student ? studentFullName(student) : "Uczeń"}
                         </span>
                         <span className="text-sm text-zinc-500">
                           Spotkanie #{meeting.meeting_number}
@@ -237,14 +189,12 @@ export function AdminDashboard() {
         ) : (
           <div className="mt-4 space-y-2">
             {recentMaterials.map((material) => {
-              const meetingRow = firstRow(material.meeting);
-              const student = toStudentSummary(meetingRow?.student);
-              const name = student
-                ? `${student.first_name} ${student.last_name}`
-                : "";
-              const meeting = meetingRow as {
-                meeting_number?: number;
-              } | null;
+              const meeting = meetings.find(
+                (item) => item.id === material.meeting_id,
+              );
+              const student = meeting
+                ? studentById(students, meeting.student_id)
+                : undefined;
               return (
                 <div
                   key={material.id}
@@ -255,8 +205,10 @@ export function AdminDashboard() {
                   </span>
                   <span className="text-sm text-zinc-500">
                     {materialLabel(material.type)}
-                    {name ? ` · ${name}` : ""}
-                    {meeting ? ` · Spotkanie #${meeting.meeting_number}` : ""}
+                    {student ? ` · ${studentFullName(student)}` : ""}
+                    {meeting
+                      ? ` · Spotkanie #${meeting.meeting_number}`
+                      : ""}
                   </span>
                 </div>
               );

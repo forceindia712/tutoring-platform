@@ -10,9 +10,13 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import { MATERIAL_BUCKET, MATERIAL_TYPES } from "@/lib/constants";
-import { apiErrorMessage } from "@/lib/admin";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import {
+  createMaterial,
+  removeStorageFile,
+  updateMaterial,
+  uploadMaterialFile,
+} from "@/lib/firebase/clientDb";
+import { MATERIAL_TYPES } from "@/lib/constants";
 import type { Material, MaterialType } from "@/lib/types";
 
 type MaterialFormProps = {
@@ -22,17 +26,6 @@ type MaterialFormProps = {
   onSaved: () => void;
   onCancel?: () => void;
 };
-
-function safeFileName(name: string): string {
-  return (
-    name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "plik"
-  );
-}
 
 export function MaterialForm({
   meetingId,
@@ -52,46 +45,26 @@ export function MaterialForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function uploadFile(): Promise<string | null> {
-    if (!file) return null;
-    const id =
-      (typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function" &&
-        crypto.randomUUID()) ||
-      `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const path = `${meetingId}/${id}-${safeFileName(file.name)}`;
-    const { error: uploadError } = await getSupabaseBrowserClient()
-      .storage.from(MATERIAL_BUCKET)
-      .upload(path, file, {
-        cacheControl: "3600",
-        contentType: file.type || "application/octet-stream",
-        upsert: false,
-      });
-    if (uploadError) {
-      throw new Error(
-        `Nie udało się przesłać pliku: ${uploadError.message}`,
-      );
-    }
-    return path;
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
 
-    let fileToRemove: string | null = null;
+    let oldPath: string | null = null;
 
     try {
       let fileUrl = material?.file_url ?? null;
+      let filePath = material?.file_path ?? null;
+
       if (type === "file" && file) {
-        fileUrl = await uploadFile();
-        if (material?.file_url && material.file_url !== fileUrl) {
-          fileToRemove = material.file_url;
-        }
+        const uploaded = await uploadMaterialFile(meetingId, file);
+        oldPath = material?.file_path ?? null;
+        fileUrl = uploaded.downloadUrl;
+        filePath = uploaded.path;
       } else if (type !== "file") {
-        fileToRemove = material?.file_url ?? null;
+        oldPath = material?.file_path ?? null;
         fileUrl = null;
+        filePath = null;
       }
 
       const payload = {
@@ -100,47 +73,34 @@ export function MaterialForm({
         description: description.trim() || null,
         url: type === "link" ? url.trim() || null : null,
         file_url: fileUrl,
-        sort_order:
-          material?.sort_order ?? sortOrder ?? material?.sort_order ?? 0,
+        file_path: filePath,
+        sort_order: material?.sort_order ?? sortOrder ?? 1,
       };
 
-      let result;
       if (material) {
-        result = await getSupabaseBrowserClient()
-          .from("materials")
-          .update(payload)
-          .eq("id", material.id)
-          .select()
-          .single();
+        await updateMaterial(material.id, payload);
       } else {
-        result = await getSupabaseBrowserClient()
-          .from("materials")
-          .insert(payload)
-          .select()
-          .single();
+        await createMaterial(meetingId, payload);
       }
 
-      if (result.error) throw result.error;
-
-      if (fileToRemove) {
-        await getSupabaseBrowserClient()
-          .storage.from(MATERIAL_BUCKET)
-          .remove([fileToRemove])
-          .catch(() => undefined);
+      if (oldPath) {
+        await removeStorageFile(oldPath).catch(() => undefined);
       }
 
       onSaved();
     } catch (err) {
       setError(
-        apiErrorMessage(
-          err,
-          "Nie udało się zapisać materiału. Sprawdź, czy wszystkie wymagane pola są wypełnione.",
-        ),
+        err && typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : "Nie udało się zapisać materiału.",
       );
     } finally {
       setSaving(false);
     }
   }
+
+  const isTextType =
+    type === "text" || type === "assignment" || type === "note";
 
   return (
     <form
@@ -174,7 +134,9 @@ export function MaterialForm({
           required
           disabled={saving}
           placeholder={
-            type === "assignment" ? "np. Zadanie domowe" : "np. Ćwiczenia Past Simple"
+            type === "assignment"
+              ? "np. Zadanie domowe"
+              : "np. Ćwiczenia Past Simple"
           }
         />
       </Field>
@@ -183,23 +145,19 @@ export function MaterialForm({
         label="Opis / treść"
         htmlFor="material-description"
         hint={
-          type === "text" ||
-          type === "assignment" ||
-          type === "note"
+          isTextType
             ? "Tutaj wpisz pełną treść materiału."
             : "Krótki opis (opcjonalnie)."
         }
       >
         <Textarea
           id="material-description"
-          rows={type === "text" || type === "assignment" || type === "note" ? 6 : 3}
+          rows={isTextType ? 6 : 3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           disabled={saving}
           placeholder={
-            type === "assignment"
-              ? "Wykonaj ćwiczenia 1–5."
-              : undefined
+            type === "assignment" ? "Wykonaj ćwiczenia 1–5." : undefined
           }
         />
       </Field>
@@ -213,7 +171,7 @@ export function MaterialForm({
             onChange={(event) => setUrl(event.target.value)}
             placeholder="https://…"
             disabled={saving}
-            required={type === "link"}
+            required
           />
         </Field>
       ) : null}

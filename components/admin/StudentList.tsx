@@ -2,16 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  Button,
-  Card,
-  EmptyState,
-  ErrorNote,
-} from "@/components/ui";
+import { Button, Card, EmptyState, ErrorNote } from "@/components/ui";
 import { StudentForm } from "@/components/admin/StudentForm";
 import { StudentLink } from "@/components/admin/StudentLink";
-import { apiErrorMessage, studentFullName } from "@/lib/admin";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { deleteStudent, listStudents } from "@/lib/firebase/clientDb";
+import { studentFullName } from "@/lib/admin";
 import type { Student } from "@/lib/types";
 
 export function StudentList() {
@@ -24,17 +19,21 @@ export function StudentList() {
 
   useEffect(() => {
     let active = true;
-    getSupabaseBrowserClient()
-      .from("students")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .then(({ data, error: loadError }) => {
+    listStudents()
+      .then((data) => {
         if (!active) return;
-        if (loadError) {
-          setError(apiErrorMessage(loadError, "Nie udało się pobrać uczniów."));
-        } else {
-          setStudents((data ?? []) as Student[]);
-        }
+        setStudents(
+          [...data].sort((a, b) =>
+            `${a.last_name} ${a.first_name}`.localeCompare(
+              `${b.last_name} ${b.first_name}`,
+            ),
+          ),
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Nie udało się pobrać uczniów.");
         setLoading(false);
       });
     return () => {
@@ -45,7 +44,13 @@ export function StudentList() {
   function handleSaved(saved: Student) {
     if (editing) {
       setStudents((current) =>
-        current.map((student) => (student.id === saved.id ? saved : student)),
+        current
+          .map((student) => (student.id === saved.id ? saved : student))
+          .sort((a, b) =>
+            `${a.last_name} ${a.first_name}`.localeCompare(
+              `${b.last_name} ${b.first_name}`,
+            ),
+          ),
       );
       setEditing(null);
       setCreating(false);
@@ -67,19 +72,15 @@ export function StudentList() {
     }
 
     setError(null);
-    const { error: deleteError } = await getSupabaseBrowserClient()
-      .from("students")
-      .delete()
-      .eq("id", student.id);
-
-    if (deleteError) {
-      setError(apiErrorMessage(deleteError, "Nie udało się usunąć ucznia."));
-      return;
+    try {
+      await deleteStudent(student.id);
+      setStudents((current) =>
+        current.filter((item) => item.id !== student.id),
+      );
+      if (createdStudent?.id === student.id) setCreatedStudent(null);
+    } catch {
+      setError("Nie udało się usunąć ucznia.");
     }
-    setStudents((current) =>
-      current.filter((item) => item.id !== student.id),
-    );
-    if (createdStudent?.id === student.id) setCreatedStudent(null);
   }
 
   return (
@@ -146,10 +147,9 @@ export function StudentList() {
         ) : null}
 
         {students.map((student) => {
-          const details = [
-            student.email,
-            student.notes,
-          ].filter(Boolean) as string[];
+          const details = [student.email, student.notes].filter(
+            Boolean,
+          ) as string[];
           return (
             <Card
               key={student.id}

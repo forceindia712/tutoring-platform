@@ -6,8 +6,18 @@ Minimalistyczna aplikacja internetowa dla nauczyciela i uczniów. Nauczyciel dod
 
 - [Next.js](https://nextjs.org) 16 (App Router) + TypeScript
 - Tailwind CSS 4
-- Supabase: PostgreSQL + Row Level Security, Auth, Storage
+- Firebase: Firestore (baza danych), Firebase Auth (logowanie nauczyciela), Firebase Storage (pliki)
 - Vercel – hosting
+
+## Jak działa bezpieczeństwo
+
+Firestore ma reguły bezpieczeństwa z pliku [`firestore.rules`](firestore.rules):
+
+- niezalogowana osoba nie ma żadnego dostępu do danych;
+- dane może czytać i zapisywać wyłącznie nauczyciel – sprawdzany po adresie e-mail w regułach;
+- uczeń nie łączy się z Firestore bezpośrednio. Jego strony (`/s/[token]`) czyta serwer Next.js przez Firebase Admin SDK i zawsze filtruje dane po `student_access_token`.
+
+Reguły Storage w [`storage.rules`](storage.rules) pozwalają wgrywać pliki tylko zalogowanemu nauczycielowi. Uczeń pobiera pliki przez linki zapisane w Firestore (linki z tokenem pobierania), więc nie potrzebuje konta.
 
 ## Struktura projektu
 
@@ -27,66 +37,81 @@ components/
   student/  – StudentLogin, StudentDashboard, MeetingCard, MeetingDetails, MaterialCard
   admin/    – AdminLogin, AdminDashboard, StudentList, StudentForm, MeetingForm, MaterialForm i in.
 lib/
-  supabase/ – klienci: przeglądarka, serwer (Auth), serwis (dane ucznia)
-  data/     – bezpieczne odczyty danych ucznia po tokenie
-supabase/schema.sql – tabele, RLS i Storage
-proxy.ts   – sprawdza sesję nauczyciela przed wejściem do /admin
+  firebase/ – konfiguracja Firebase, Firebase Admin, warstwa dostępu do Firestore
+  data/     – bezpieczne odczyty danych ucznia po tokenie (serwer)
+firestore.rules  – reguły bezpieczeństwa Firestore
+storage.rules    – reguły bezpieczeństwa Storage
 ```
 
 ## Wymagania
 
 - Node.js 20.9+
-- konto [Supabase](https://supabase.com)
-- konto [Vercel](https://vercel.com) (do wdrożenia)
+- konto [Firebase](https://firebase.google.com) (plan Spark wystarczy na start)
+- konto [Vercel](https://vercel.com)
 
-## 1. Konfiguracja Supabase
+## 1. Konfiguracja Firebase
 
-1. Załóż projekt w Supabase.
-2. Otwórz **SQL Editor** i uruchom całą zawartość pliku [`supabase/schema.sql`](supabase/schema.sql).
+1. Załóż projekt w konsoli Firebase.
+2. Otwórz **Build → Firestore Database** i kliknij **Create database** (tryb produkcyjny, region np. `europe-west3`).
+3. W plikach [`firestore.rules`](firestore.rules) i [`storage.rules`](storage.rules) zamień przykładowy `teacher@example.com` na adres e-mail nauczyciela.
+4. W konsoli opublikuj reguły: **Firestore → Rules** oraz **Storage → Rules**.
 
-Plik tworzy trzy tabele:
+## 2. Tworzenie danych w Firestore
+
+Firestore nie wymaga definiowania tabel ani schematu. Dokumenty tworzy sama aplikacja. Kolekcje i pola:
 
 ```text
-students  – id, imię, nazwisko, e-mail, notatki, student_access_token, created_at
-meetings  – id, student_id, meeting_number, data, godzina, url, instrukcje, notatka
-materials – id, meeting_id, typ, tytuł, opis, url, file_url, sort_order
+students
+  id, first_name, last_name, email, notes,
+  student_access_token, search_name, created_at
+
+meetings
+  id, student_id, meeting_number, meeting_date, meeting_time,
+  meeting_url, instructions, notes, created_at, updated_at
+
+materials
+  id, meeting_id, type, title, description, url,
+  file_url, file_path, sort_order, created_at
 ```
 
-Włącza Row Level Security i dodaje polityki:
+## 3. Firebase Auth (tylko nauczyciel)
 
-- `anon` (niezalogowany) nie może nic odczytać ani zapisać;
-- `authenticated` (zalogowany nauczyciel) może zarządzać wszystkimi danymi;
-- Storage ma prywatny koszyk `meeting-materials` – pliki może wgrywać tylko nauczyciel.
+1. W Firebase otwórz **Build → Authentication → Sign-in method** i włącz **Email/Password**.
+2. W **Users** kliknij **Add user** i załóż konto nauczyciela (e-mail + hasło). Użyj dokładnie tego adresu, który wpisałeś do reguł bezpieczeństwa.
+3. Reguły Firestore i Storage przepuszczają tylko tego jednego nauczyciela – nawet gdyby ktoś ręcznie założył sobie konto, nie zobaczy danych.
 
-Uczeń nigdy nie łączy się bezpośrednio z bazą. Strony `/s/...` pobierają dane po stronie serwera Next.js, zawsze filtrowane po `student_access_token`, więc uczeń widzi tylko swoje dane.
+## 4. Aplikacja webowa i zmienne środowiskowe
 
-## 2. Konfiguracja Auth (tylko nauczyciel)
+1. W **Project settings → General → Your apps** kliknij ikonę `</>` (Web).
+2. Zarejestruj aplikację i skopiuj obiekt konfiguracji (`apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId`).
+3. W **Project settings → Service accounts** kliknij **Generate new private key** – pobierzesz JSON konta serwisowego.
 
-1. W Supabase otwórz **Authentication → Providers → Email** i upewnij się, że provider e-mail jest włączony.
-2. W **Authentication → Settings** wyłącz opcję **Allow new users to sign up** (nowe konta zakładać może wyłącznie właściciel projektu).
-3. Utwórz konto nauczyciela:
-   - **Authentication → Users → Add user**, albo
-   - tymczasowo włącz rejestrację, załóż konto w aplikacji (`/admin`), a potem znów ją wyłącz.
-
-## 3. Zmienne środowiskowe
-
-Skopiuj `.env.example` do `.env.local` i uzupełnij:
+Skopiuj `.env.example` do `.env.local`:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 ```
 
-Wartości znajdziesz w Supabase: **Project Settings → API**.
+Zmienne `NEXT_PUBLIC_*` są publiczne – tak ma być. Zmienne `FIREBASE_*` pochodzą z pliku JSON konta serwisowego:
 
-| Zmienna | Gdzie używa się | Uwagi |
-| --- | --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | przeglądarka i serwer | publiczna |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | przeglądarka i serwer | publiczna, chroniona przez RLS |
-| `SUPABASE_SERVICE_ROLE_KEY` | tylko serwer | klucz serwisowy – nigdy nie trafia do przeglądarki; używa go wyłącznie kod serwerowy stron ucznia |
+| Pole w JSON | Zmienna |
+| --- | --- |
+| `project_id` | `FIREBASE_PROJECT_ID` |
+| `client_email` | `FIREBASE_CLIENT_EMAIL` |
+| `private_key` | `FIREBASE_PRIVATE_KEY` |
 
-## 4. Uruchomienie lokalne
+`FIREBASE_PRIVATE_KEY` to długi klucz z wieloma znakami nowej linii. W `.env.local` możesz wstawić cały klucz w cudzysłowie. Jeśli wklejasz go z `\n` jako tekstem, aplikacja zamieni `\n` na prawdziwe nowe linie.
+
+## 5. Uruchomienie lokalne
 
 ```bash
 npm install
@@ -95,7 +120,7 @@ npm run dev
 
 Otwórz [http://localhost:3000](http://localhost:3000).
 
-## 5. Jak działa aplikacja
+## 6. Jak działa aplikacja
 
 ### Strona ucznia
 
@@ -124,17 +149,17 @@ Po zalogowaniu możesz:
 - dodawać do spotkania materiały: link, plik, tekst, zadanie lub notatkę;
 - edytować, usuwać i zmieniać kolejność materiałów.
 
-## 6. Deployment na Vercel
+## 7. Deployment na Vercel
 
-1. Wrzuć projekt na GitHub (patrz niżej).
+1. Wrzuć projekt na GitHub.
 2. W Vercel: **Add New → Project** i wybierz repozytorium.
 3. Framework wykryje się automatycznie (Next.js).
-4. Dodaj trzy zmienne środowiskowe z sekcji 3 (wartości z Supabase).
+4. Dodaj dziewięć zmiennych środowiskowych z sekcji 4 (wartości z Firebase).
 5. Kliknij **Deploy**.
 
 Gotowe. Panel nauczyciela znajdziesz pod `https://twojadomena.pl/admin`.
 
-## 7. Wrzucenie na GitHub (krótko)
+## 8. Wrzucenie na GitHub (krótko)
 
 ```bash
 git init
@@ -147,15 +172,15 @@ git push -u origin main
 
 ## Uwagi o bezpieczeństwie
 
-- Klucz `SUPABASE_SERVICE_ROLE_KEY` jest używany tylko w kodzie serwerowym; nie ma go w bundle'u klienckim.
-- Wszystkie tabele mają włączone RLS. Bez polityk dla roli `anon` uczeń nie ma żadnego bezpośredniego dostępu do bazy.
-- Panel `/admin` chroni `proxy.ts` + Supabase Auth.
-- Imię i nazwisko nie jest przekazywane w URL – po zalogowaniu aplikacja używa losowego tokenu.
-- Pliki wgrywane są do prywatnego koszyka, a uczeń pobiera je przez krótkotrwałe podpisane URL-e generowane na serwerze.
+- Klucze konta serwisowego (`FIREBASE_*`) są używane tylko w kodzie serwerowym; nie ma ich w bundle'u klienckim.
+- Firestore i Storage mają włączone reguły bezpieczeństwa – niezalogowany uczeń nie może odczytać bazy ani listy uczniów.
+- Panel `/admin` jest chroniony przez Firebase Auth i sprawdzany przy wejściu przez komponent `AdminGate`.
+- Imię i nazwisko nie jest przekazywane w URL – po zalogowaniu aplikacja używa losowego tokenu ucznia.
+- Pliki wgrywane są do prywatnego Storage, a uczeń pobiera je po linkach z tokenem pobierania.
 
 ## Możliwe rozszerzenia
 
 - wysyłka linku e-mailem/SMS;
 - przypomnienia o spotkaniach;
-- dodatkowe konta nauczycieli (wtedy warto rozszerzyć RLS o tabelę `teachers`);
-- podział spotkań grupowych (dodanie tabeli pośredniej `meeting_students`).
+- konta dodatkowych nauczycieli z własnym `teacher_id` na dokumentach;
+- spotkania grupowe (osobna kolekcja `meeting_students`).

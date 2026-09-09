@@ -4,61 +4,75 @@ import { useEffect, useState } from "react";
 import { BackLink, Card, ErrorNote, SuccessNote } from "@/components/ui";
 import { MaterialsManager } from "@/components/admin/MaterialsManager";
 import { MeetingForm } from "@/components/admin/MeetingForm";
-import { studentFullName, toStudentSummary } from "@/lib/admin";
+import { getMeeting, getStudent } from "@/lib/firebase/clientDb";
+import { studentFullName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import type { Meeting } from "@/lib/types";
+import type { Meeting, Student } from "@/lib/types";
 
 export function MeetingEditor({ meetingId }: { meetingId: string }) {
   const [meeting, setMeeting] = useState<Meeting | null>(null);
-  const [student, setStudent] = useState<{
-    id: string;
-    first_name: string;
-    last_name: string;
-  } | null>(null);
+  const [student, setStudent] = useState<
+    Pick<Student, "id" | "first_name" | "last_name"> | null
+  >(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function loadMeeting() {
+    const meetingData = await getMeeting(meetingId);
+    if (!meetingData) {
+      setError("Nie znaleziono spotkania.");
+      setLoading(false);
+      return;
+    }
+
+    const studentData = await getStudent(meetingData.student_id);
+    setMeeting(meetingData);
+    setStudent(
+      studentData
+        ? {
+            id: studentData.id,
+            first_name: studentData.first_name,
+            last_name: studentData.last_name,
+          }
+        : null,
+    );
+    setLoading(false);
+  }
+
   useEffect(() => {
     let active = true;
-    getSupabaseBrowserClient()
-      .from("meetings")
-      .select("*, student:students(id, first_name, last_name)")
-      .eq("id", meetingId)
-      .single()
-      .then(({ data, error: loadError }) => {
-        if (!active) return;
-        if (loadError) {
-          setError("Nie udało się pobrać spotkania.");
+    getMeeting(meetingId)
+      .then(async (meetingData) => {
+        if (!meetingData) {
+          if (!active) return;
+          setError("Nie znaleziono spotkania.");
           setLoading(false);
           return;
         }
-        const row = data as Meeting & { student?: unknown };
-        setMeeting(row);
-        setStudent(toStudentSummary(row.student));
-        setSaved(false);
+        const studentData = await getStudent(meetingData.student_id);
+        if (!active) return;
+        setMeeting(meetingData);
+        setStudent(
+          studentData
+            ? {
+                id: studentData.id,
+                first_name: studentData.first_name,
+                last_name: studentData.last_name,
+              }
+            : null,
+        );
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Nie udało się pobrać spotkania.");
         setLoading(false);
       });
     return () => {
       active = false;
     };
   }, [meetingId]);
-
-  async function refresh() {
-    const { data, error: loadError } = await getSupabaseBrowserClient()
-      .from("meetings")
-      .select("*, student:students(id, first_name, last_name)")
-      .eq("id", meetingId)
-      .single();
-    if (loadError) {
-      setError("Nie udało się odświeżyć spotkania.");
-      return;
-    }
-    setMeeting(data as Meeting);
-    setStudent(toStudentSummary((data as Meeting & { student?: unknown }).student));
-    setSaved(false);
-  }
 
   if (loading) {
     return <p className="text-sm text-zinc-500">Wczytywanie spotkania…</p>;
@@ -75,7 +89,6 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
     );
   }
 
-  const studentLabel = student ? studentFullName(student) : "Uczeń";
   const backHref = student
     ? `/admin/students/${student.id}`
     : "/admin/dashboard";
@@ -83,7 +96,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
   return (
     <div>
       <BackLink href={backHref}>
-        {student ? `${studentLabel} · profil` : "Panel nauczyciela"}
+        {student ? `${studentFullName(student)} · profil` : "Panel nauczyciela"}
       </BackLink>
 
       <div className="mt-5">
@@ -92,7 +105,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
           meeting={meeting}
           onSaved={() => {
             setSaved(true);
-            void refresh();
+            void loadMeeting();
           }}
         />
       </div>
@@ -116,7 +129,9 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
             <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Uczeń
             </p>
-            <p className="mt-1 font-medium text-zinc-900">{studentLabel}</p>
+            <p className="mt-1 font-medium text-zinc-900">
+              {student ? studentFullName(student) : "Uczeń"}
+            </p>
           </Card>
           <Card className="p-5">
             <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">

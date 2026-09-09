@@ -3,18 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  BackLink,
-  Button,
-  Card,
-  EmptyState,
-  ErrorNote,
-} from "@/components/ui";
+import { BackLink, Button, Card, EmptyState, ErrorNote } from "@/components/ui";
 import { StudentForm } from "@/components/admin/StudentForm";
 import { StudentLink } from "@/components/admin/StudentLink";
-import { apiErrorMessage, studentFullName } from "@/lib/admin";
+import { deleteStudent, getStudent, listMeetingsForStudent } from "@/lib/firebase/clientDb";
+import { studentFullName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { Meeting, Student } from "@/lib/types";
 
 export function StudentProfile({ studentId }: { studentId: string }) {
@@ -27,30 +21,18 @@ export function StudentProfile({ studentId }: { studentId: string }) {
 
   useEffect(() => {
     let active = true;
-    const client = getSupabaseBrowserClient();
-    Promise.all([
-      client.from("students").select("*").eq("id", studentId).single(),
-      client
-        .from("meetings")
-        .select("*")
-        .eq("student_id", studentId)
-        .order("meeting_date", { ascending: false })
-        .order("meeting_time", { ascending: false }),
-    ]).then(([studentResult, meetingsResult]) => {
-      if (!active) return;
-      if (studentResult.error || meetingsResult.error) {
-        setError(
-          apiErrorMessage(
-            studentResult.error ?? meetingsResult.error,
-            "Nie udało się pobrać profilu ucznia.",
-          ),
-        );
-      } else {
-        setStudent(studentResult.data as Student);
-        setMeetings((meetingsResult.data ?? []) as Meeting[]);
-      }
-      setLoading(false);
-    });
+    Promise.all([getStudent(studentId), listMeetingsForStudent(studentId)])
+      .then(([studentResult, meetingsResult]) => {
+        if (!active) return;
+        setStudent(studentResult);
+        setMeetings(meetingsResult);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Nie udało się pobrać profilu ucznia.");
+        setLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -65,16 +47,13 @@ export function StudentProfile({ studentId }: { studentId: string }) {
     ) {
       return;
     }
-    const { error: deleteError } = await getSupabaseBrowserClient()
-      .from("students")
-      .delete()
-      .eq("id", student.id);
-    if (deleteError) {
-      setError(apiErrorMessage(deleteError, "Nie udało się usunąć ucznia."));
-      return;
+    try {
+      await deleteStudent(student.id);
+      router.push("/admin/students");
+      router.refresh();
+    } catch {
+      setError("Nie udało się usunąć ucznia.");
     }
-    router.push("/admin/students");
-    router.refresh();
   }
 
   if (loading) {
