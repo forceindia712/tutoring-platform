@@ -84,6 +84,7 @@ student_infos
 Pole `url` służy zarówno typowi „Link”, jak i „Plik” – w obu przypadkach nauczyciel zapisuje adres strony lub udostępnionego pliku.
 Spotkanie bez linku jest traktowane jako stacjonarne – nauczyciel może dopisać miejsce (`meeting_location`).
 `student_infos` to ogólne informacje pokazywane uczniowi na jego stronie głównej (np. harmonogram albo stały link do spotkań online).
+Rok szkolny nie jest osobnym polem – aplikacja wylicza go z daty spotkania (`meeting_date`): od 1 września do 31 sierpnia, np. spotkanie 12.09.2026 należy do roku 2026/2027.
 
 ## 3. Firebase Auth (tylko nauczyciel)
 
@@ -161,6 +162,7 @@ Po zalogowaniu możesz:
 - edytować, usuwać i zmieniać kolejność materiałów.
 - szukać lekcji po instrukcjach, notatkach i materiałach (np. wpisanie „ułamki” pokaże spotkania o ułamkach);
 - sortować listę spotkań ucznia od najnowszych lub od najstarszych.
+- filtrować spotkania i wyszukiwanie po roku szkolnym (domyślnie bieżący, np. 2026/2027).
 
 ### Materiały „Plik” jako linki
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Card, ErrorNote } from "@/components/ui";
+import { Card, ErrorNote, Select } from "@/components/ui";
 import { LessonSearch } from "@/components/admin/LessonSearch";
 import {
   listAllMaterials,
@@ -10,7 +10,12 @@ import {
   listStudents,
 } from "@/lib/firebase/clientDb";
 import { studentFullName } from "@/lib/admin";
-import { dayLabel, formatTime } from "@/lib/format";
+import {
+  currentSchoolYear,
+  dayLabel,
+  formatTime,
+  schoolYearForDate,
+} from "@/lib/format";
 import type { Material, Meeting, Student } from "@/lib/types";
 
 function studentById(students: Student[], id: string): Student | undefined {
@@ -23,6 +28,7 @@ export function AdminDashboard() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
 
   useEffect(() => {
     let active = true;
@@ -54,7 +60,22 @@ export function AdminDashboard() {
   const day = String(today.getDate()).padStart(2, "0");
   const todayKey = `${today.getFullYear()}-${month}-${day}`;
 
-  const upcomingMeetings = meetings
+  const availableYears = Array.from(
+    new Set([
+      currentSchoolYear(),
+      ...meetings.map((meeting) => schoolYearForDate(meeting.meeting_date)),
+    ]),
+  ).sort((a, b) => b.localeCompare(a));
+
+  const meetingsInYear = meetings.filter(
+    (meeting) => schoolYearForDate(meeting.meeting_date) === schoolYear,
+  );
+  const meetingsInYearIds = new Set(meetingsInYear.map((meeting) => meeting.id));
+  const materialsInYear = materials.filter((material) =>
+    meetingsInYearIds.has(material.meeting_id),
+  );
+
+  const upcomingMeetings = meetingsInYear
     .filter((meeting) => meeting.meeting_date >= todayKey)
     .sort((a, b) =>
       `${a.meeting_date}T${a.meeting_time}`.localeCompare(
@@ -63,7 +84,7 @@ export function AdminDashboard() {
     )
     .slice(0, 8);
 
-  const recentMaterials = [...materials]
+  const recentMaterials = [...materialsInYear]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 6);
 
@@ -94,6 +115,23 @@ export function AdminDashboard() {
         Szybki przegląd uczniów i najbliższych spotkań.
       </p>
 
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm text-zinc-600">
+          Rok szkolny
+          <Select
+            value={schoolYear}
+            onChange={(event) => setSchoolYear(event.target.value)}
+            className="w-44"
+          >
+            {availableYears.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </Select>
+        </label>
+      </div>
+
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Card className="p-5">
           <p className="text-sm font-medium text-zinc-600">Uczniowie</p>
@@ -112,13 +150,13 @@ export function AdminDashboard() {
             Nadchodzące spotkania
           </p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {meetings.filter((meeting) => meeting.meeting_date >= todayKey).length}
+            {meetingsInYear.filter((meeting) => meeting.meeting_date >= todayKey).length}
           </p>
         </Card>
         <Card className="p-5">
           <p className="text-sm font-medium text-zinc-600">Materiały</p>
           <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">
-            {materials.length}
+            {materialsInYear.length}
           </p>
           <Link
             href="/admin/meetings/new"
@@ -130,9 +168,9 @@ export function AdminDashboard() {
       </div>
 
       <LessonSearch
-        meetings={meetings}
+        meetings={meetingsInYear}
         students={students}
-        materials={materials}
+        materials={materialsInYear}
       />
 
       <section className="mt-10">

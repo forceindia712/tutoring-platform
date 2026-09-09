@@ -62,3 +62,15 @@ export function dayLabel(date: string): string {
 
   return formatDate(date);
 }
+
+export function schoolYearForDate(date: string): string {
+  const [yearText, monthText] = date.split("-");
+  const year = Number.parseInt(yearText, 10);
+  const month = Number.parseInt(monthText, 10);
+  const startYear = month >= 9 ? year : year - 1;
+  return `${startYear}/${startYear + 1}`;
+}
+
+export function currentSchoolYear(): string {
+  return schoolYearForDate(toLocalDateKey(new Date()));
+}

@@ -16,7 +16,11 @@ import { StudentLink } from "@/components/admin/StudentLink";
 import { StudentInfosManager } from "@/components/admin/StudentInfosManager";
 import { deleteStudent, getStudent, listMeetingsForStudent } from "@/lib/firebase/clientDb";
 import { studentFullName } from "@/lib/admin";
-import { formatDateTime } from "@/lib/format";
+import {
+  currentSchoolYear,
+  formatDateTime,
+  schoolYearForDate,
+} from "@/lib/format";
 import type { Meeting, Student } from "@/lib/types";
 
 export function StudentProfile({ studentId }: { studentId: string }) {
@@ -25,6 +29,7 @@ export function StudentProfile({ studentId }: { studentId: string }) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [editing, setEditing] = useState(false);
   const [meetingOrder, setMeetingOrder] = useState<"desc" | "asc">("desc");
+  const [schoolYear, setSchoolYear] = useState(currentSchoolYear());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -80,7 +85,18 @@ export function StudentProfile({ studentId }: { studentId: string }) {
     );
   }
 
-  const sortedMeetings = [...meetings].sort((a, b) => {
+  const availableYears = Array.from(
+    new Set([
+      currentSchoolYear(),
+      ...meetings.map((meeting) => schoolYearForDate(meeting.meeting_date)),
+    ]),
+  ).sort((a, b) => b.localeCompare(a));
+
+  const meetingsInYear = meetings.filter(
+    (meeting) => schoolYearForDate(meeting.meeting_date) === schoolYear,
+  );
+
+  const sortedMeetings = [...meetingsInYear].sort((a, b) => {
     const left = `${a.meeting_date}T${a.meeting_time}`;
     const right = `${b.meeting_date}T${b.meeting_time}`;
     return meetingOrder === "desc"
@@ -158,6 +174,21 @@ export function StudentProfile({ studentId }: { studentId: string }) {
           <h2 className="text-lg font-semibold text-zinc-900">Spotkania</h2>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-zinc-600">
+              Rok szkolny
+              <Select
+                value={schoolYear}
+                onChange={(event) => setSchoolYear(event.target.value)}
+                className="w-44"
+                aria-label="Rok szkolny"
+              >
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </Select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-zinc-600">
               Sortowanie
               <Select
                 value={meetingOrder}
@@ -183,6 +214,12 @@ export function StudentProfile({ studentId }: { studentId: string }) {
         {meetings.length === 0 ? (
           <div className="mt-4">
             <EmptyState>Ten uczeń nie ma jeszcze żadnych spotkań.</EmptyState>
+          </div>
+        ) : meetingsInYear.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState>
+              Brak spotkań ucznia w roku szkolnym {schoolYear}.
+            </EmptyState>
           </div>
         ) : (
           <div className="mt-4 space-y-3">
