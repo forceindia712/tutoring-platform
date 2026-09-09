@@ -6,15 +6,25 @@ import type { Meeting } from "@/lib/types";
 type MeetingCardProps = {
   meeting: Meeting;
   studentToken: string;
+  statusLabel?: string | null;
 };
 
-export function MeetingCard({ meeting, studentToken }: MeetingCardProps) {
+export function MeetingCard({
+  meeting,
+  studentToken,
+  statusLabel,
+}: MeetingCardProps) {
   return (
     <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p className="font-semibold text-zinc-900">
           Spotkanie #{meeting.meeting_number}
         </p>
+        {statusLabel ? (
+          <p className="mt-1 inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-500">
+            {statusLabel}
+          </p>
+        ) : null}
         <p className="mt-1 text-sm text-zinc-600">
           {formatDateTime(meeting.meeting_date, meeting.meeting_time)}
         </p>

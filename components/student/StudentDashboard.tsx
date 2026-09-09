@@ -83,28 +83,20 @@ export function StudentDashboard({
     return terms.every((term) => haystack.includes(term));
   });
 
-  const sortedSearchResults = [...searchResults].sort((a, b) => {
+  function byOrder(a: Meeting, b: Meeting): number {
     const left = `${a.meeting_date}T${a.meeting_time}`;
     const right = `${b.meeting_date}T${b.meeting_time}`;
     const compared = left.localeCompare(right);
     return order === "desc" ? compared * -1 : compared;
-  });
+  }
 
-  const upcoming = meetingsInYear
-    .filter((meeting) => isMeetingUpcoming(meeting))
-    .sort((a, b) =>
-      `${a.meeting_date}T${a.meeting_time}`.localeCompare(
-        `${b.meeting_date}T${b.meeting_time}`,
-      ),
-    );
+  const visibleMeetings = isSearching
+    ? [...searchResults].sort(byOrder)
+    : [...meetingsInYear].sort(byOrder);
 
-  const past = meetingsInYear
-    .filter((meeting) => !isMeetingUpcoming(meeting))
-    .sort((a, b) =>
-      `${b.meeting_date}T${b.meeting_time}`.localeCompare(
-        `${a.meeting_date}T${a.meeting_time}`,
-      ),
-    );
+  function statusLabel(meeting: Meeting): string {
+    return isMeetingUpcoming(meeting) ? "Nadchodzące" : "Wcześniejsze";
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:py-14">
@@ -174,95 +166,52 @@ export function StudentDashboard({
           />
         </div>
 
-        {isSearching ? (
-          <div className="mt-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-zinc-500">
-                {sortedSearchResults.length === 1
-                  ? "1 znalezione spotkanie"
-                  : `${sortedSearchResults.length} znalezionych spotkań`}
-              </p>
-              <label className="flex items-center gap-2 text-sm text-zinc-600">
-                Sortowanie
-                <Select
-                  value={order}
-                  onChange={(event) =>
-                    setOrder(event.target.value as "desc" | "asc")
-                  }
-                  className="w-44"
-                  aria-label="Sortowanie wyników"
-                >
-                  <option value="desc">Od najnowszych</option>
-                  <option value="asc">Od najstarszych</option>
-                </Select>
-              </label>
-            </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-zinc-500">
+            {isSearching
+              ? visibleMeetings.length === 1
+                ? "1 znalezione spotkanie"
+                : `${visibleMeetings.length} znalezionych spotkań`
+              : `${visibleMeetings.length} spotkań w roku ${schoolYear}`}
+          </p>
+          <label className="flex items-center gap-2 text-sm text-zinc-600">
+            Sortowanie
+            <Select
+              value={order}
+              onChange={(event) =>
+                setOrder(event.target.value as "desc" | "asc")
+              }
+              className="w-44"
+              aria-label="Sortowanie spotkań"
+            >
+              <option value="desc">Od najnowszych</option>
+              <option value="asc">Od najstarszych</option>
+            </Select>
+          </label>
+        </div>
 
-            {sortedSearchResults.length === 0 ? (
-              <div className="mt-4">
-                <EmptyState>
-                  Brak spotkań pasujących do „{query.trim()}”.
-                </EmptyState>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                {sortedSearchResults.map((meeting) => (
-                  <MeetingCard
-                    key={meeting.id}
-                    meeting={meeting}
-                    studentToken={studentToken}
-                  />
-                ))}
-              </div>
-            )}
+        {mounted && visibleMeetings.length === 0 ? (
+          <div className="mt-5">
+            <EmptyState>
+              {isSearching
+                ? `Brak spotkań pasujących do „${query.trim()}”.`
+                : meetings.length === 0
+                  ? "Nie masz jeszcze żadnych spotkań."
+                  : `Brak spotkań w roku szkolnym ${schoolYear}.`}
+            </EmptyState>
           </div>
         ) : null}
 
-        {!isSearching ? (
-          <div className="mt-5">
-            {mounted && meetingsInYear.length === 0 ? (
-              <div className="mt-4">
-                <EmptyState>
-                  {meetings.length === 0
-                    ? "Nie masz jeszcze żadnych spotkań."
-                    : `Brak spotkań w roku szkolnym ${schoolYear}.`}
-                </EmptyState>
-              </div>
-            ) : null}
-
-            {mounted && upcoming.length > 0 ? (
-              <div className="mt-6">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Nadchodzące spotkania
-                </h3>
-                <div className="mt-3 space-y-3">
-                  {upcoming.map((meeting) => (
-                    <MeetingCard
-                      key={meeting.id}
-                      meeting={meeting}
-                      studentToken={studentToken}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {mounted && past.length > 0 ? (
-              <div className="mt-8">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  Wcześniejsze spotkania
-                </h3>
-                <div className="mt-3 space-y-3">
-                  {past.map((meeting) => (
-                    <MeetingCard
-                      key={meeting.id}
-                      meeting={meeting}
-                      studentToken={studentToken}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : null}
+        {mounted && visibleMeetings.length > 0 ? (
+          <div className="mt-5 space-y-3">
+            {visibleMeetings.map((meeting) => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                studentToken={studentToken}
+                statusLabel={statusLabel(meeting)}
+              />
+            ))}
           </div>
         ) : null}
       </section>
