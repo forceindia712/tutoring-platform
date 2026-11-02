@@ -175,6 +175,17 @@ Typ „Plik” nie wgrywa pliku do aplikacji. Wystarczy udostępnić plik w Goog
 
 Uczeń zobaczy przy materiale przycisk „Otwórz plik”.
 
+## Powiadomienia e-mail i SMS
+
+W widoku spotkania nauczyciela (karta „Powiadomienia”) są przyciski wysyłki do ucznia i do rodzica/opiekuna.
+
+- **E-mail** wysyła serwer przez Gmail SMTP (nodemailer) z konta nauczyciela. Potrzebne zmienne: `TEACHER_EMAIL`, `GMAIL_USER`, `GMAIL_APP_PASSWORD` (hasło aplikacji Google, wymaga weryfikacji dwuetapowej), `APP_BASE_URL`, opcjonalnie `MAIL_FROM_NAME`.
+- **SMS** nie jest wysyłany przez aplikację. Aplikacja przygotowuje treść, a nauczyciel wysyła ją ze swojego telefonu i potwierdza przyciskiem „Wysłałem SMS”.
+- Wiadomość zawsze powstaje na serwerze z aktualnych danych spotkania; adres i numer pochodzą z bazy (`students.email/phone/parent_*`).
+- Stan i historia wysyłek: kolekcje `notification_states` i `notification_attempts` (zapis tylko przez serwer; po zmianie reguł opublikuj `firestore.rules`).
+- Endpoint: `POST /api/meetings/[id]/notify` (wymaga tokenu Firebase nauczyciela).
+- Status „przyjęty” oznacza tylko, że serwer pocztowy przyjął wiadomość, a nie że dotarła.
+
 ## 7. Deployment na Vercel
 
 1. Wrzuć projekt na GitHub.

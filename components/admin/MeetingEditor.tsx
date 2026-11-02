@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BackLink, Card, ErrorNote, SuccessNote } from "@/components/ui";
 import { MaterialsManager } from "@/components/admin/MaterialsManager";
 import { MeetingForm } from "@/components/admin/MeetingForm";
+import { NotifyCard } from "@/components/admin/NotifyCard";
 import { getMeeting, getStudent } from "@/lib/firebase/clientDb";
 import { studentFullName } from "@/lib/admin";
 import { formatDateTime } from "@/lib/format";
@@ -14,6 +15,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
   const [student, setStudent] = useState<
     Pick<Student, "id" | "first_name" | "last_name"> | null
   >(null);
+  const [fullStudent, setFullStudent] = useState<Student | null>(null);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
 
     const studentData = await getStudent(meetingData.student_id);
     setMeeting(meetingData);
+    setFullStudent(studentData);
     setStudent(
       studentData
         ? {
@@ -53,6 +56,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
         const studentData = await getStudent(meetingData.student_id);
         if (!active) return;
         setMeeting(meetingData);
+        setFullStudent(studentData);
         setStudent(
           studentData
             ? {
@@ -162,6 +166,7 @@ export function MeetingEditor({ meetingId }: { meetingId: string }) {
               </p>
             ) : null}
           </Card>
+          <NotifyCard meetingId={meeting.id} student={fullStudent} />
         </aside>
       </div>
     </div>

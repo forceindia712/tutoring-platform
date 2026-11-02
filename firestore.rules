@@ -27,5 +27,17 @@ service cloud.firestore {
     match /student_infos/{infoId} {
       allow read, write: if isTeacher();
     }
+
+    // Stan i historia powiadomień: zapisuje wyłącznie serwer (Admin SDK
+    // omija reguły). Nauczyciel może je czytać i usuwać (np. razem z uczniem).
+    match /notification_states/{stateId} {
+      allow read, delete: if isTeacher();
+      allow create, update: if false;
+    }
+
+    match /notification_attempts/{attemptId} {
+      allow read, delete: if isTeacher();
+      allow create, update: if false;
+    }
   }
 }

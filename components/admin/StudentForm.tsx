@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Card, ErrorNote, Field, Input, Textarea } from "@/components/ui";
 import { createStudent, updateStudent } from "@/lib/firebase/clientDb";
+import { normalizePolishPhone } from "@/lib/notifications/phone";
 import type { Student } from "@/lib/types";
 
 type StudentFormProps = {
@@ -17,6 +18,10 @@ export function StudentForm({ student, onSaved, onCancel }: StudentFormProps) {
   const [firstName, setFirstName] = useState(student?.first_name ?? "");
   const [lastName, setLastName] = useState(student?.last_name ?? "");
   const [email, setEmail] = useState(student?.email ?? "");
+  const [phone, setPhone] = useState(student?.phone ?? "");
+  const [parentName, setParentName] = useState(student?.parent_name ?? "");
+  const [parentEmail, setParentEmail] = useState(student?.parent_email ?? "");
+  const [parentPhone, setParentPhone] = useState(student?.parent_phone ?? "");
   const [notes, setNotes] = useState(student?.notes ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -26,10 +31,29 @@ export function StudentForm({ student, onSaved, onCancel }: StudentFormProps) {
     setSaving(true);
     setError(null);
 
+    const phoneNormalized = phone.trim() ? normalizePolishPhone(phone) : null;
+    const parentPhoneNormalized = parentPhone.trim()
+      ? normalizePolishPhone(parentPhone)
+      : null;
+    if (phone.trim() && !phoneNormalized) {
+      setError("Numer telefonu ucznia jest niepoprawny (podaj 9 cyfr, np. 600 100 200).");
+      setSaving(false);
+      return;
+    }
+    if (parentPhone.trim() && !parentPhoneNormalized) {
+      setError("Numer telefonu rodzica jest niepoprawny (podaj 9 cyfr, np. 600 100 200).");
+      setSaving(false);
+      return;
+    }
+
     const input = {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       email: email.trim() || null,
+      phone: phoneNormalized,
+      parent_name: parentName.trim() || null,
+      parent_email: parentEmail.trim() || null,
+      parent_phone: parentPhoneNormalized,
       notes: notes.trim() || null,
     };
 
@@ -75,17 +99,64 @@ export function StudentForm({ student, onSaved, onCancel }: StudentFormProps) {
             disabled={saving}
           />
         </Field>
+        <Field label="E-mail ucznia (opcjonalnie)" htmlFor="student-email">
+          <Input
+            id="student-email"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            disabled={saving}
+          />
+        </Field>
+        <Field
+          label="Telefon ucznia (opcjonalnie)"
+          htmlFor="student-phone"
+          hint="Polski numer, np. 600 100 200."
+        >
+          <Input
+            id="student-phone"
+            type="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            disabled={saving}
+          />
+        </Field>
         <div className="sm:col-span-2">
-          <Field label="E-mail (opcjonalnie)" htmlFor="student-email">
+          <p className="text-sm font-semibold text-zinc-900">
+            Rodzic / opiekun (opcjonalnie)
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Dane kontaktowe służą tylko do wysyłania powiadomień o spotkaniach.
+          </p>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label="Imię i nazwisko rodzica" htmlFor="student-parent-name">
             <Input
-              id="student-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
+              id="student-parent-name"
+              value={parentName}
+              onChange={(event) => setParentName(event.target.value)}
               disabled={saving}
             />
           </Field>
         </div>
+        <Field label="E-mail rodzica" htmlFor="student-parent-email">
+          <Input
+            id="student-parent-email"
+            type="email"
+            value={parentEmail}
+            onChange={(event) => setParentEmail(event.target.value)}
+            disabled={saving}
+          />
+        </Field>
+        <Field label="Telefon rodzica" htmlFor="student-parent-phone">
+          <Input
+            id="student-parent-phone"
+            type="tel"
+            value={parentPhone}
+            onChange={(event) => setParentPhone(event.target.value)}
+            disabled={saving}
+          />
+        </Field>
         <div className="sm:col-span-2">
           <Field
             label="Notatka (opcjonalnie)"

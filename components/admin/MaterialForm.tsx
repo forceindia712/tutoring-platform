@@ -39,6 +39,7 @@ export function MaterialForm({
   const [title, setTitle] = useState(material?.title ?? "");
   const [description, setDescription] = useState(material?.description ?? "");
   const [url, setUrl] = useState(material?.url ?? "");
+  const [dueDate, setDueDate] = useState(material?.due_date ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -54,6 +55,7 @@ export function MaterialForm({
         title: title.trim(),
         description: description.trim() || null,
         url: isLinkLike ? url.trim() || null : null,
+        due_date: type === "assignment" ? dueDate || null : null,
         sort_order: material?.sort_order ?? sortOrder ?? 1,
       };
 
@@ -138,6 +140,22 @@ export function MaterialForm({
           }
         />
       </Field>
+
+      {type === "assignment" ? (
+        <Field
+          label="Termin oddania (opcjonalnie)"
+          htmlFor="material-due-date"
+          hint="Pojawi się w powiadomieniu i w panelu ucznia."
+        >
+          <Input
+            id="material-due-date"
+            type="date"
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+            disabled={saving}
+          />
+        </Field>
+      ) : null}
 
       {isLinkLike ? (
         <Field

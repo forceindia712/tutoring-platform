@@ -16,7 +16,14 @@ import { getFirestoreClient } from "@/lib/firebase/client";
 import { hydrateFromFirestore } from "@/lib/firebase/convert";
 import { normalizedFullName } from "@/lib/names";
 import { generateAccessToken } from "@/lib/token";
-import type { Material, Meeting, Student, StudentInfo } from "@/lib/types";
+import type {
+  Material,
+  Meeting,
+  NotificationAttempt,
+  NotificationState,
+  Student,
+  StudentInfo,
+} from "@/lib/types";
 
 function db() {
   return getFirestoreClient();
@@ -30,6 +37,10 @@ export type StudentInput = {
   first_name: string;
   last_name: string;
   email: string | null;
+  phone: string | null;
+  parent_name: string | null;
+  parent_email: string | null;
+  parent_phone: string | null;
   notes: string | null;
 };
 
@@ -49,6 +60,10 @@ export async function createStudent(input: StudentInput): Promise<Student> {
     first_name: input.first_name,
     last_name: input.last_name,
     email: input.email,
+    phone: input.phone,
+    parent_name: input.parent_name,
+    parent_email: input.parent_email,
+    parent_phone: input.parent_phone,
     notes: input.notes,
     student_access_token: accessToken,
     search_name: normalizedFullName(input.first_name, input.last_name),
@@ -70,6 +85,10 @@ export async function updateStudent(
     first_name: input.first_name,
     last_name: input.last_name,
     email: input.email,
+    phone: input.phone,
+    parent_name: input.parent_name,
+    parent_email: input.parent_email,
+    parent_phone: input.parent_phone,
     notes: input.notes,
     search_name: normalizedFullName(input.first_name, input.last_name),
   });
@@ -92,6 +111,17 @@ export async function deleteStudent(studentId: string): Promise<void> {
     );
     for (const materialSnapshot of materialsSnapshot.docs) {
       await deleteDoc(doc(db(), "materials", materialSnapshot.id));
+    }
+    for (const name of ["notification_states", "notification_attempts"]) {
+      const logs = await getDocs(
+        query(
+          collection(db(), name),
+          where("meeting_id", "==", meetingSnapshot.id),
+        ),
+      );
+      for (const log of logs.docs) {
+        await deleteDoc(doc(db(), name, log.id));
+      }
     }
     await deleteDoc(doc(db(), "meetings", meetingSnapshot.id));
   }
@@ -222,6 +252,7 @@ export type MaterialInput = {
   title: string;
   description: string | null;
   url: string | null;
+  due_date: string | null;
   sort_order: number;
 };
 
@@ -312,4 +343,30 @@ export async function moveStudentInfo(
   await updateDoc(doc(db(), "student_infos", infoId), {
     sort_order: nextSortOrder,
   });
+}
+
+export async function listNotificationStates(
+  meetingId: string,
+): Promise<NotificationState[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db(), "notification_states"),
+      where("meeting_id", "==", meetingId),
+    ),
+  );
+  return snapshot.docs.map((item) => hydrate<NotificationState>(item));
+}
+
+export async function listNotificationAttempts(
+  meetingId: string,
+): Promise<NotificationAttempt[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db(), "notification_attempts"),
+      where("meeting_id", "==", meetingId),
+    ),
+  );
+  return snapshot.docs
+    .map((item) => hydrate<NotificationAttempt>(item))
+    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 }

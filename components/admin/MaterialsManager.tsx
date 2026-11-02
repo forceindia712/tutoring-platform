@@ -9,6 +9,7 @@ import {
   moveMaterial,
 } from "@/lib/firebase/clientDb";
 import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
+import { formatDate } from "@/lib/format";
 import type { Material } from "@/lib/types";
 
 export function MaterialsManager({ meetingId }: { meetingId: string }) {
@@ -152,6 +153,11 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
                     {MATERIAL_TYPE_LABELS[material.type] ?? material.type}
                   </span>
                 </div>
+                {material.type === "assignment" && material.due_date ? (
+                  <p className="mt-1 text-sm font-medium text-amber-700">
+                    Termin oddania: {formatDate(material.due_date)}
+                  </p>
+                ) : null}
                 {material.description ? (
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-zinc-600">
                     {material.description}
