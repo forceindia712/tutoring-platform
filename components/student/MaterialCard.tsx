@@ -45,6 +45,7 @@ export function MaterialCard({ material, index }: MaterialCardProps) {
   const showContent =
     material.type === "text" ||
     material.type === "assignment" ||
+    material.type === "homework" ||
     material.type === "note";
 
   return (
@@ -61,7 +62,7 @@ export function MaterialCard({ material, index }: MaterialCardProps) {
             </span>
           </div>
 
-          {material.type === "assignment" && material.due_date ? (
+          {material.type === "homework" && material.due_date ? (
             <p className="mt-2 text-sm font-semibold text-amber-700">
               Termin oddania: {formatDate(material.due_date)}
             </p>

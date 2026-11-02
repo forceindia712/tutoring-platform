@@ -55,7 +55,7 @@ export function MaterialForm({
         title: title.trim(),
         description: description.trim() || null,
         url: isLinkLike ? url.trim() || null : null,
-        due_date: type === "assignment" ? dueDate || null : null,
+        due_date: type === "homework" ? dueDate || null : null,
         sort_order: material?.sort_order ?? sortOrder ?? 1,
       };
 
@@ -78,7 +78,10 @@ export function MaterialForm({
   }
 
   const isTextType =
-    type === "text" || type === "assignment" || type === "note";
+    type === "text" ||
+    type === "assignment" ||
+    type === "homework" ||
+    type === "note";
   const isLinkLike = type === "link" || type === "file";
 
   return (
@@ -113,7 +116,9 @@ export function MaterialForm({
           required
           disabled={saving}
           placeholder={
-            type === "assignment"
+            type === "homework"
+              ? "np. Ćwiczenia ze strony 42"
+              : type === "assignment"
               ? "np. Zadanie domowe"
               : "np. Ćwiczenia Past Simple"
           }
@@ -136,12 +141,14 @@ export function MaterialForm({
           onChange={(event) => setDescription(event.target.value)}
           disabled={saving}
           placeholder={
-            type === "assignment" ? "Wykonaj ćwiczenia 1–5." : undefined
+            type === "assignment" || type === "homework"
+              ? "Wykonaj ćwiczenia 1–5."
+              : undefined
           }
         />
       </Field>
 
-      {type === "assignment" ? (
+      {type === "homework" ? (
         <Field
           label="Termin oddania (opcjonalnie)"
           htmlFor="material-due-date"

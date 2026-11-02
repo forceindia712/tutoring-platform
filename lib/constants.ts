@@ -3,6 +3,7 @@ export const MATERIAL_TYPES = [
   { value: "file", label: "Plik (link)" },
   { value: "text", label: "Tekst" },
   { value: "assignment", label: "Zadanie" },
+  { value: "homework", label: "Praca domowa" },
   { value: "note", label: "Notatka" },
 ] as const;
 
@@ -11,5 +12,6 @@ export const MATERIAL_TYPE_LABELS: Record<string, string> = {
   file: "Plik (link)",
   text: "Tekst",
   assignment: "Zadanie",
+  homework: "Praca domowa",
   note: "Notatka",
 };

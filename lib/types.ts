@@ -1,4 +1,10 @@
-export type MaterialType = "link" | "file" | "text" | "assignment" | "note";
+export type MaterialType =
+  | "link"
+  | "file"
+  | "text"
+  | "assignment"
+  | "homework"
+  | "note";
 
 export type Student = {
   id: string;

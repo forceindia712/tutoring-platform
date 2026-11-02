@@ -153,7 +153,7 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
                     {MATERIAL_TYPE_LABELS[material.type] ?? material.type}
                   </span>
                 </div>
-                {material.type === "assignment" && material.due_date ? (
+                {material.type === "homework" && material.due_date ? (
                   <p className="mt-1 text-sm font-medium text-amber-700">
                     Termin oddania: {formatDate(material.due_date)}
                   </p>

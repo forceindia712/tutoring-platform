@@ -30,7 +30,8 @@ export type PreparedNotification = {
 };
 
 export function homeworkFromMaterials(materials: Material[]): Homework | null {
-  const assignments = materials.filter((item) => item.type === "assignment");
+  // Pracą domową jest wyłącznie materiał typu „Praca domowa”.
+  const assignments = materials.filter((item) => item.type === "homework");
   if (assignments.length === 0) return null;
   const dates = assignments
     .map((item) => item.due_date)
