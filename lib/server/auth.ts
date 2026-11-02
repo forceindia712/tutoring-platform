@@ -51,7 +51,9 @@ export async function requireTeacher(request: Request): Promise<void> {
 
   const user = data.users?.[0];
   const email = user?.email?.toLowerCase();
-  if (!email || email !== teacherEmail || user?.emailVerified === false) {
+  // Tak samo jak firestore.rules: liczy się adres konta, bez emailVerified
+  // (konta e-mail/hasło zwykle nie mają potwierdzonego adresu).
+  if (!email || email !== teacherEmail) {
     throw new AuthError("Brak uprawnień.", 403);
   }
 }
