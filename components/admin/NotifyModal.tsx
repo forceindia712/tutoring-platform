@@ -313,9 +313,7 @@ export function NotifyModal({
                 />
                 <p className="text-xs text-zinc-500">
                   {preview.sms.length} znaków · {preview.sms.segments}{" "}
-                  {preview.sms.segments === 1 ? "SMS" : "SMS-y"} · bez polskich
-                  znaków (unikamy kodowania Unicode, które skraca SMS do 70
-                  znaków).
+                  {preview.sms.segments === 1 ? "SMS" : "SMS-y"} · polskie litery skracają SMS do 70 znaków (67 w wiadomości wieloczęściowej).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
