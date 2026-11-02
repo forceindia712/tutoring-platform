@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui";
 import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { Material } from "@/lib/types";
 
 type MaterialCardProps = {
@@ -18,6 +18,19 @@ function actionForMaterial(material: Material) {
         className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-900"
       >
         Otwórz materiał
+      </a>
+    );
+  }
+
+  if (material.type === "homework" && material.url) {
+    return (
+      <a
+        href={material.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-4 hover:decoration-zinc-900"
+      >
+        Otwórz zadanie
       </a>
     );
   }
@@ -64,7 +77,10 @@ export function MaterialCard({ material, index }: MaterialCardProps) {
 
           {material.type === "homework" && material.due_date ? (
             <p className="mt-2 text-sm font-semibold text-amber-700">
-              Termin oddania: {formatDate(material.due_date)}
+              Termin oddania:{" "}
+              {material.due_time
+                ? formatDateTime(material.due_date, material.due_time)
+                : formatDate(material.due_date)}
             </p>
           ) : null}
 

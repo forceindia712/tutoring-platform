@@ -253,6 +253,7 @@ export type MaterialInput = {
   description: string | null;
   url: string | null;
   due_date: string | null;
+  due_time: string | null;
   sort_order: number;
 };
 

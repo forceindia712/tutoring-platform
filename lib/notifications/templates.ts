@@ -1,10 +1,14 @@
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { NotificationAudience } from "@/lib/types";
 
 export type Homework = {
   titles: string[];
   // Najwcześniejszy termin spośród zadań, które go mają (YYYY-MM-DD).
   dueDate: string | null;
+  // Godzina (HH:MM), tylko gdy jest termin.
+  dueTime: string | null;
+  // Zadania z linkiem do szybkiego otwarcia.
+  links: { title: string; url: string }[];
 };
 
 export type MessageContext = {
@@ -76,7 +80,9 @@ export function smsSegments(text: string): { length: number; segments: number } 
 export function buildSmsText(ctx: MessageContext): string {
   const date = shortDate(ctx.meetingDate);
   const first = toGsmSafe(ctx.studentFirstName);
-  const due = ctx.homework?.dueDate ? shortDate(ctx.homework.dueDate) : null;
+  const due = ctx.homework?.dueDate
+    ? `${shortDate(ctx.homework.dueDate)}${ctx.homework.dueTime ? ` ${ctx.homework.dueTime}` : ""}`
+    : null;
 
   if (ctx.audience === "parent") {
     const head = `Dzien dobry! W panelu zajec (${first}) sa materialy ze spotkania ${date}.`;
@@ -98,7 +104,12 @@ export function buildSmsText(ctx: MessageContext): string {
 export function buildEmail(ctx: MessageContext): EmailContent {
   const isParent = ctx.audience === "parent";
   const dateLong = formatDate(ctx.meetingDate);
-  const dueLong = ctx.homework?.dueDate ? formatDate(ctx.homework.dueDate) : null;
+  const dueLong = ctx.homework?.dueDate
+    ? ctx.homework.dueTime
+      ? formatDateTime(ctx.homework.dueDate, ctx.homework.dueTime)
+      : formatDate(ctx.homework.dueDate)
+    : null;
+  const hwLinks = ctx.homework?.links ?? [];
 
   const subject = isParent
     ? `Nowe materiały ze spotkania – ${ctx.studentFirstName}, ${dateLong}`
@@ -134,6 +145,7 @@ export function buildEmail(ctx: MessageContext): EmailContent {
     textLines.push("", "PRACA DOMOWA", hwLead);
     if (dueLong) textLines.push(`Termin oddania: ${dueLong}`);
     for (const title of hwTitles) textLines.push(`- ${title}`);
+    for (const item of hwLinks) textLines.push(`Otwórz zadanie (${item.title}): ${item.url}`);
     textLines.push("Szczegóły zadania znajdziesz w materiałach spotkania.");
   }
   textLines.push("", closing);
@@ -162,6 +174,12 @@ export function buildEmail(ctx: MessageContext): EmailContent {
                     .join("")}</ul>`
                 : ""
             }
+            ${hwLinks
+              .map(
+                (item) =>
+                  `<p style="margin:0 0 10px 0;"><a href="${escapeHtml(item.url)}" style="display:inline-block;background:#b45309;color:#ffffff;font-family:${font};font-size:14px;font-weight:600;text-decoration:none;padding:10px 20px;border-radius:10px;">Otwórz zadanie${hwLinks.length > 1 ? `: ${escapeHtml(item.title)}` : ""}</a></p>`,
+              )
+              .join("")}
             <p style="margin:0;font-size:14px;line-height:1.6;color:#52525b;">Szczegóły zadania znajdziesz w materiałach spotkania.</p>
           </td></tr>
         </table>

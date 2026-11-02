@@ -119,7 +119,11 @@ export async function POST(
       recipient: prepared.recipient,
       contentHash,
       homework: prepared.homework
-        ? { titles: prepared.homework.titles, dueDate: prepared.homework.dueDate }
+        ? {
+            titles: prepared.homework.titles,
+            dueDate: prepared.homework.dueDate,
+            dueTime: prepared.homework.dueTime,
+          }
         : null,
       email: prepared.email,
       sms: prepared.smsText

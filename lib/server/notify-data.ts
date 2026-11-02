@@ -33,13 +33,22 @@ export function homeworkFromMaterials(materials: Material[]): Homework | null {
   // Pracą domową jest wyłącznie materiał typu „Praca domowa”.
   const assignments = materials.filter((item) => item.type === "homework");
   if (assignments.length === 0) return null;
-  const dates = assignments
-    .map((item) => item.due_date)
-    .filter((value): value is string => Boolean(value))
-    .sort();
+  // Najwcześniejszy termin (data + godzina; brak godziny = początek dnia).
+  const dated = assignments
+    .filter((item) => Boolean(item.due_date))
+    .sort((a, b) =>
+      `${a.due_date}T${a.due_time ?? "00:00"}`.localeCompare(
+        `${b.due_date}T${b.due_time ?? "00:00"}`,
+      ),
+    );
+  const first = dated[0];
   return {
     titles: assignments.map((item) => item.title),
-    dueDate: dates[0] ?? null,
+    dueDate: first?.due_date ?? null,
+    dueTime: first?.due_time?.slice(0, 5) ?? null,
+    links: assignments
+      .filter((item) => Boolean(item.url))
+      .map((item) => ({ title: item.title, url: item.url as string })),
   };
 }
 

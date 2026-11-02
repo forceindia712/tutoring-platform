@@ -9,7 +9,7 @@ import {
   moveMaterial,
 } from "@/lib/firebase/clientDb";
 import { MATERIAL_TYPE_LABELS } from "@/lib/constants";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { Material } from "@/lib/types";
 
 export function MaterialsManager({ meetingId }: { meetingId: string }) {
@@ -155,7 +155,10 @@ export function MaterialsManager({ meetingId }: { meetingId: string }) {
                 </div>
                 {material.type === "homework" && material.due_date ? (
                   <p className="mt-1 text-sm font-medium text-amber-700">
-                    Termin oddania: {formatDate(material.due_date)}
+                    Termin oddania:{" "}
+                    {material.due_time
+                      ? formatDateTime(material.due_date, material.due_time)
+                      : formatDate(material.due_date)}
                   </p>
                 ) : null}
                 {material.description ? (

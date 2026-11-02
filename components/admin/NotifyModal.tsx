@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, ErrorNote, SuccessNote, Textarea } from "@/components/ui";
 import { getFirebaseAuthClient } from "@/lib/firebase/client";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { formatPolishPhone } from "@/lib/notifications/phone";
 import type { NotificationAudience, NotificationChannel } from "@/lib/types";
 
@@ -16,7 +16,11 @@ type PreviewState = {
 type Preview = {
   recipient: string | null;
   contentHash: string;
-  homework: { titles: string[]; dueDate: string | null } | null;
+  homework: {
+    titles: string[];
+    dueDate: string | null;
+    dueTime: string | null;
+  } | null;
   email: { subject: string; html: string; text: string } | null;
   sms: { text: string; length: number; segments: number } | null;
   state: PreviewState | null;
@@ -206,7 +210,11 @@ export function NotifyModal({
 
   const homeworkInfo = preview?.homework
     ? preview.homework.dueDate
-      ? `Tak, termin oddania: ${formatDate(preview.homework.dueDate)}`
+      ? `Tak, termin oddania: ${
+          preview.homework.dueTime
+            ? formatDateTime(preview.homework.dueDate, preview.homework.dueTime)
+            : formatDate(preview.homework.dueDate)
+        }`
       : "Tak, bez terminu oddania"
     : "Nie";
 

@@ -40,6 +40,7 @@ export function MaterialForm({
   const [description, setDescription] = useState(material?.description ?? "");
   const [url, setUrl] = useState(material?.url ?? "");
   const [dueDate, setDueDate] = useState(material?.due_date ?? "");
+  const [dueTime, setDueTime] = useState(material?.due_time?.slice(0, 5) ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -49,13 +50,15 @@ export function MaterialForm({
     setError(null);
 
     try {
-      const isLinkLike = type === "link" || type === "file";
+      const hasUrl = type === "link" || type === "file" || type === "homework";
       const payload = {
         type,
         title: title.trim(),
         description: description.trim() || null,
-        url: isLinkLike ? url.trim() || null : null,
+        url: hasUrl ? url.trim() || null : null,
         due_date: type === "homework" ? dueDate || null : null,
+        // Godzina ma sens tylko razem z datą.
+        due_time: type === "homework" && dueDate ? dueTime || null : null,
         sort_order: material?.sort_order ?? sortOrder ?? 1,
       };
 
@@ -154,11 +157,38 @@ export function MaterialForm({
           htmlFor="material-due-date"
           hint="Pojawi się w powiadomieniu i w panelu ucznia."
         >
+          <div className="flex gap-2">
+            <Input
+              id="material-due-date"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              disabled={saving}
+            />
+            <Input
+              id="material-due-time"
+              type="time"
+              aria-label="Godzina oddania"
+              value={dueTime}
+              onChange={(event) => setDueTime(event.target.value)}
+              disabled={saving || !dueDate}
+            />
+          </div>
+        </Field>
+      ) : null}
+
+      {type === "homework" ? (
+        <Field
+          label="Link do zadania (opcjonalnie)"
+          htmlFor="material-homework-url"
+          hint="Np. plik na Google Drive. Pojawi się w e-mailu jako przycisk do szybkiego otwarcia."
+        >
           <Input
-            id="material-due-date"
-            type="date"
-            value={dueDate}
-            onChange={(event) => setDueDate(event.target.value)}
+            id="material-homework-url"
+            type="url"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            placeholder="https://…"
             disabled={saving}
           />
         </Field>
